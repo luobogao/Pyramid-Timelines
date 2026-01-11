@@ -67,6 +67,16 @@ body.fullscreen-mode .collapse-btn {
   display: block;
 }
 
+/* Mobile mode - hide everything except small year display */
+body.mobile-mode #angleReadout,
+body.mobile-mode #yearReadout #yearInput,
+body.mobile-mode .collapse-btn {
+  display: none !important;
+}
+body.mobile-mode #yearReadout #yearBig {
+  font-size: 24px;
+}
+
 /* Right Panel */
 #rightPanel {
   position: fixed;
@@ -627,16 +637,3 @@ body.fullscreen-mode .collapse-btn {
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
 }
 
-/* Mobile mode styles */
-@media (max-width: 768px) {
-  body.mobile-mode #angleReadout,
-  body.mobile-mode #yearReadout input,
-  body.mobile-mode .collapse-btn {
-    display: none !important;
-  }
-
-  /* Show only year, smaller text */
-  body.mobile-mode #yearReadout #yearBig {
-    font-size: 24px;
-  }
-}

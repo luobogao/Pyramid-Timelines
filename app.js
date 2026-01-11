@@ -2385,6 +2385,9 @@ function initMobileMode() {
   document.body.classList.add('fullscreen-mode');
   document.body.classList.add('mobile-mode');
 
+  // Hide the blue error arc in 3D view
+  if (errorArc) errorArc.visible = false;
+
   // Wait for presets to load, then apply khufu preset
   function applyMobilePreset() {
     if (PRESETS.khufu2600) {
