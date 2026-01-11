@@ -627,53 +627,16 @@ body.fullscreen-mode .collapse-btn {
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
 }
 
-/* Mobile dialog overlay */
-.mobile-dialog-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.mobile-dialog {
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 12px;
-  padding: 24px 28px;
-  max-width: 320px;
-  text-align: center;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(8px);
-}
-
-.mobile-dialog p {
-  margin: 0 0 20px 0;
-  font-size: 16px;
-  line-height: 1.5;
-  color: #111;
-}
-
-.mobile-dialog button {
-  background: linear-gradient(to bottom, #333, #222);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 12px 32px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-/* Mobile: hide all UI elements */
+/* Mobile mode styles */
 @media (max-width: 768px) {
   body.mobile-mode #angleReadout,
-  body.mobile-mode #yearReadout,
+  body.mobile-mode #yearReadout input,
   body.mobile-mode .collapse-btn {
     display: none !important;
+  }
+
+  /* Show only year, smaller text */
+  body.mobile-mode #yearReadout #yearBig {
+    font-size: 24px;
   }
 }

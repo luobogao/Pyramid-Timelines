@@ -2396,16 +2396,11 @@ function initMobileMode() {
   }
   applyMobilePreset();
 
-  // Show dialog after 1 second
+  // Show native browser alert after 1 second
   setTimeout(() => {
-    document.getElementById('mobileDialog').style.display = 'flex';
+    alert('Adjust settings on the desktop version of this website');
   }, 1000);
 }
-
-// Dialog close button
-document.getElementById('mobileDialogClose').addEventListener('click', () => {
-  document.getElementById('mobileDialog').style.display = 'none';
-});
 
 // Initialize mobile mode on load
 initMobileMode();
