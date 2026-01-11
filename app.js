@@ -212,6 +212,108 @@ pyramids.forEach((p) => {
 });
 
 // -----------------------------
+// Khufu Internal Structure (King's Chamber, Queen's Chamber, passages)
+// Approximate dimensions based on archaeological surveys
+// -----------------------------
+// Chamber elevations above pyramid base (meters)
+const KINGS_CHAMBER_Z = 42.3;
+const QUEENS_CHAMBER_Z = 21.2;
+
+function makeWireframeBox(cx, cy, cz, width, depth, height, material) {
+  // Creates a wireframe box centered at (cx, cy, cz)
+  const hw = width / 2, hd = depth / 2, hh = height / 2;
+  const corners = [
+    [cx - hw, cy - hd, cz - hh], [cx + hw, cy - hd, cz - hh],
+    [cx + hw, cy + hd, cz - hh], [cx - hw, cy + hd, cz - hh],
+    [cx - hw, cy - hd, cz + hh], [cx + hw, cy - hd, cz + hh],
+    [cx + hw, cy + hd, cz + hh], [cx - hw, cy + hd, cz + hh]
+  ];
+  const boxEdges = [
+    [0,1],[1,2],[2,3],[3,0], // bottom
+    [4,5],[5,6],[6,7],[7,4], // top
+    [0,4],[1,5],[2,6],[3,7]  // verticals
+  ];
+  const positions = [];
+  for (const [a, b] of boxEdges) {
+    positions.push(...corners[a], ...corners[b]);
+  }
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  return new THREE.LineSegments(geom, material);
+}
+
+function makePassageLine(points, material) {
+  const positions = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    positions.push(...points[i], ...points[i + 1]);
+  }
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  return new THREE.LineSegments(geom, material);
+}
+
+const chamberMat = new THREE.LineBasicMaterial({ color: 0x444444 });
+const passageMat = new THREE.LineBasicMaterial({ color: 0x666666 });
+
+// King's Chamber: ~10.5m (E-W) x 5.2m (N-S) x 5.8m high
+// Located slightly south of center, at KINGS_CHAMBER_Z elevation
+const kingsWidth = 10.5, kingsDepth = 5.2, kingsHeight = 5.8;
+const kingsCX = 0, kingsCY = -5, kingsCZ = KINGS_CHAMBER_Z + kingsHeight / 2;
+const kingsChamber = makeWireframeBox(kingsCX, kingsCY, kingsCZ, kingsWidth, kingsDepth, kingsHeight, chamberMat);
+kingsChamber.name = "King's Chamber";
+kingsChamber.frustumCulled = false;
+kingsChamber.renderOrder = 11;
+world.add(kingsChamber);
+
+// Queen's Chamber: ~5.7m (E-W) x 5.2m (N-S) x 6.2m high (pointed roof)
+// Located at center, at QUEENS_CHAMBER_Z elevation
+const queensWidth = 5.7, queensDepth = 5.2, queensHeight = 4.7;
+const queensCX = 0, queensCY = 0, queensCZ = QUEENS_CHAMBER_Z + queensHeight / 2;
+const queensChamber = makeWireframeBox(queensCX, queensCY, queensCZ, queensWidth, queensDepth, queensHeight, chamberMat);
+queensChamber.name = "Queen's Chamber";
+queensChamber.frustumCulled = false;
+queensChamber.renderOrder = 11;
+world.add(queensChamber);
+
+// Grand Gallery: ascending passage from ~23m to ~43m elevation, running south to north
+// Approximately 47m long at 26° incline
+const grandGalleryStart = [0, -40, 23];
+const grandGalleryEnd = [0, -8, KINGS_CHAMBER_Z];
+const grandGallery = makePassageLine([grandGalleryStart, grandGalleryEnd], passageMat);
+grandGallery.name = "Grand Gallery";
+grandGallery.frustumCulled = false;
+grandGallery.renderOrder = 11;
+world.add(grandGallery);
+
+// Ascending passage: from entrance down to Grand Gallery start
+const ascendingStart = [0, -60, 5];
+const ascendingEnd = grandGalleryStart;
+const ascendingPassage = makePassageLine([ascendingStart, ascendingEnd], passageMat);
+ascendingPassage.name = "Ascending Passage";
+ascendingPassage.frustumCulled = false;
+ascendingPassage.renderOrder = 11;
+world.add(ascendingPassage);
+
+// Horizontal passage to Queen's Chamber
+const horizPassageStart = [0, -25, QUEENS_CHAMBER_Z];
+const horizPassageEnd = [0, queensCY - queensDepth/2, QUEENS_CHAMBER_Z];
+const horizPassage = makePassageLine([horizPassageStart, horizPassageEnd], passageMat);
+horizPassage.name = "Queen's Passage";
+horizPassage.frustumCulled = false;
+horizPassage.renderOrder = 11;
+world.add(horizPassage);
+
+// Descending passage: from entrance going down underground
+const entrancePoint = [0, 55, 17]; // North face entrance
+const descendStart = [0, 30, 5];
+const descendEnd = [0, 0, -30]; // Goes underground
+const descendingPassage = makePassageLine([entrancePoint, descendStart, descendEnd], passageMat);
+descendingPassage.name = "Descending Passage";
+descendingPassage.frustumCulled = false;
+descendingPassage.renderOrder = 11;
+world.add(descendingPassage);
+
+// -----------------------------
 // Great Sphinx - simplified box geometry
 // Location: ~320m east, ~430m south of Khufu (based on GPS coordinates)
 // Facing due East
@@ -289,7 +391,7 @@ const angleEl = document.getElementById('angleReadout');
 // Sky sphere radius - all directional lines extend to this distance
 const SKY_RADIUS = 3500;
 
-// Red beam from Khufu center (0,0,0) toward Alnilam direction on the sky sphere.
+// Red beam from King's Chamber toward Alnilam direction on the sky sphere.
 // Implemented as a thin cylinder so it remains visible at a wide range of zoom levels.
 const BEAM_RADIUS = 3.0; // meters (visual thickness)
 const beamGeom = new THREE.CylinderGeometry(1, 1, 1, 18, 1, true);
@@ -320,11 +422,37 @@ shaftLine.frustumCulled = false;
 shaftLine.renderOrder = 9998;
 sceneMain.add(shaftLine);
 
-// Set once: constant orientation and position (from Khufu center outward)
+// Set once: constant orientation and position (from King's Chamber outward)
 const SHAFT_LENGTH = SKY_RADIUS; // extend to sky sphere
 shaftLine.scale.set(SHAFT_RADIUS, SHAFT_LENGTH, SHAFT_RADIUS);
 shaftLine.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), shaftDir);
-shaftLine.position.copy(shaftDir.clone().multiplyScalar(SHAFT_LENGTH / 2));
+const shaftOrigin = new THREE.Vector3(0, 0, KINGS_CHAMBER_Z);
+shaftLine.position.copy(shaftDir.clone().multiplyScalar(SHAFT_LENGTH / 2).add(shaftOrigin));
+
+// -----------------------------
+// Queen's Chamber SOUTH shaft
+// Inclination ~39.47° (Gantenbrink survey), azimuth due South (180°)
+// -----------------------------
+const QUEENS_SHAFT_AZ_RAD  = deg2rad(180.0); // due South
+const QUEENS_SHAFT_ALT_RAD = deg2rad(39.47); // inclination above horizontal
+const queensShaftDir = new THREE.Vector3(
+  Math.sin(QUEENS_SHAFT_AZ_RAD) * Math.cos(QUEENS_SHAFT_ALT_RAD),
+  Math.cos(QUEENS_SHAFT_AZ_RAD) * Math.cos(QUEENS_SHAFT_ALT_RAD),
+  Math.sin(QUEENS_SHAFT_ALT_RAD)
+).normalize();
+
+const queensShaftGeom = new THREE.CylinderGeometry(1, 1, 1, 18, 1, true);
+const queensShaftMat  = new THREE.MeshBasicMaterial({ color: 0x000000, depthTest: false, depthWrite: false });
+const queensShaftLine = new THREE.Mesh(queensShaftGeom, queensShaftMat);
+queensShaftLine.frustumCulled = false;
+queensShaftLine.renderOrder = 9997;
+sceneMain.add(queensShaftLine);
+
+// Set once: constant orientation and position (from Queen's Chamber outward)
+queensShaftLine.scale.set(SHAFT_RADIUS, SHAFT_LENGTH, SHAFT_RADIUS);
+queensShaftLine.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), queensShaftDir);
+const queensShaftOrigin = new THREE.Vector3(0, 0, QUEENS_CHAMBER_Z);
+queensShaftLine.position.copy(queensShaftDir.clone().multiplyScalar(SHAFT_LENGTH / 2).add(queensShaftOrigin));
 
 // -----------------------------
 // Sphinx sight line - pointing due East, angled 15° upward
@@ -1071,8 +1199,11 @@ function updateSkyForJD(jd, epj) {
       const dot2 = p2.x * camPos.x + p2.y * camPos.y + p2.z * camPos.z;
       const isVisible = showFullGlobe || dot1 < 0 || dot2 < 0;  // Show if full globe or at least one endpoint on far side
 
-      // Color: red if nearest constellation in Sphinx mode, else black; white if hidden
-      const isHighlighted = (currentOriginKey === 'sphinx' && constId === nearestConstId);
+      // Color: red if nearest constellation in Sphinx mode, or Orion in Alnilam culmination mode; else black; white if hidden
+      const snapMode = document.querySelector('input[name="snapMode"]:checked').value;
+      const isSphinxHighlight = (currentOriginKey === 'sphinx' && constId === nearestConstId);
+      const isOrionHighlight = (snapMode === 'culmination' && constId === 'Ori');
+      const isHighlighted = isSphinxHighlight || isOrionHighlight;
       const r = isVisible ? (isHighlighted ? 0.85 : 0.0) : 1.0;
       const g = isVisible ? 0.0 : 1.0;
       const b = isVisible ? 0.0 : 1.0;
@@ -1094,7 +1225,8 @@ function updateSkyForJD(jd, epj) {
     const length = SKY_RADIUS;  // extend to sky sphere
     alnilamBeam.scale.set(BEAM_RADIUS, length, BEAM_RADIUS);
     alnilamBeam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-    alnilamBeam.position.copy(dir.clone().multiplyScalar(length / 2));
+    const beamOrigin = new THREE.Vector3(0, 0, KINGS_CHAMBER_Z);
+    alnilamBeam.position.copy(dir.clone().multiplyScalar(length / 2).add(beamOrigin));
 
     // Azimuth from North towards East; Altitude above horizon
     let az = Math.atan2(dir.x, dir.y);
@@ -1132,22 +1264,43 @@ const timeLabel  = document.getElementById('timeLabel');
 // Exponential year mapping: more resolution near present, less in distant past
 const YEAR_MIN = -100000;
 const YEAR_MAX = 2026;
-const YEAR_EXPONENT = 0.2;  // Lower = more resolution near present
 
-// Convert slider (0-1000) to year using exponential mapping
+// Piecewise linear scale breakpoints for better distribution
+// Format: { slider: 0-1000, year: corresponding year }
+const SCALE_BREAKPOINTS = [
+  { slider: 0,    year: -100000 },
+  { slider: 150,  year: -50000 },   // 15% of slider for -100k to -50k
+  { slider: 400,  year: -10000 },   // 25% of slider for -50k to -10k
+  { slider: 600,  year: -5000 },    // 20% of slider for -10k to -5k (predynastic)
+  { slider: 1000, year: 2026 },     // 40% of slider for -5k to present (dynasties)
+];
+
+// Convert slider (0-1000) to year using piecewise linear mapping
 function sliderToYear(sliderVal) {
-  const t = sliderVal / 1000;  // 0 to 1
-  // t^exponent gives more slider range to recent years
-  const yearRange = YEAR_MAX - YEAR_MIN;
-  return Math.round(YEAR_MIN + yearRange * Math.pow(t, YEAR_EXPONENT));
+  const s = Math.max(0, Math.min(1000, sliderVal));
+  for (let i = 1; i < SCALE_BREAKPOINTS.length; i++) {
+    const prev = SCALE_BREAKPOINTS[i - 1];
+    const curr = SCALE_BREAKPOINTS[i];
+    if (s <= curr.slider) {
+      const t = (s - prev.slider) / (curr.slider - prev.slider);
+      return Math.round(prev.year + t * (curr.year - prev.year));
+    }
+  }
+  return YEAR_MAX;
 }
 
 // Convert year to slider value (inverse of above)
 function yearToSlider(year) {
-  const yearRange = YEAR_MAX - YEAR_MIN;
-  const normalized = (year - YEAR_MIN) / yearRange;  // 0 to 1
-  const t = Math.pow(Math.max(0, Math.min(1, normalized)), 1 / YEAR_EXPONENT);
-  return Math.round(t * 1000);
+  const y = Math.max(YEAR_MIN, Math.min(YEAR_MAX, year));
+  for (let i = 1; i < SCALE_BREAKPOINTS.length; i++) {
+    const prev = SCALE_BREAKPOINTS[i - 1];
+    const curr = SCALE_BREAKPOINTS[i];
+    if (y <= curr.year) {
+      const t = (y - prev.year) / (curr.year - prev.year);
+      return Math.round(prev.slider + t * (curr.slider - prev.slider));
+    }
+  }
+  return 1000;
 }
 
 // -----------------------------
@@ -1166,6 +1319,7 @@ function applyOrigin() {
 
   // Show/hide directional lines based on selected origin
   shaftLine.visible = (currentOriginKey === 'khufu');
+  queensShaftLine.visible = (currentOriginKey === 'khufu');
   alnilamBeam.visible = (currentOriginKey === 'khufu');
   errorArc.visible = (currentOriginKey === 'khufu');
   sphinxSightLine.visible = (currentOriginKey === 'sphinx');
@@ -1174,13 +1328,17 @@ function applyOrigin() {
   scheduleSkyUpdate();
 }
 
-// Full globe toggle
-document.getElementById('chkFullGlobe').addEventListener('change', (e) => {
-  showFullGlobe = e.target.checked;
-  console.log('=== FULL GLOBE ===');
-  console.log(`showFullGlobe = ${showFullGlobe};`);
-  scheduleSkyUpdate();
-});
+// Settings loaded from external JSON file
+fetch('settings.json')
+  .then(response => response.json())
+  .then(data => {
+    if (typeof data.showFullGlobe === 'boolean') {
+      showFullGlobe = data.showFullGlobe;
+      console.log('Settings loaded: showFullGlobe =', showFullGlobe);
+      scheduleSkyUpdate();
+    }
+  })
+  .catch(err => console.error('Failed to load settings:', err));
 
 originRadios.forEach(r => {
   r.addEventListener('change', () => {
@@ -1381,11 +1539,30 @@ function getSelectedJDandEPJ() {
   return { jd, epj, y, m, d, hh, mm, doy };
 }
 
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
+                     'July', 'August', 'September', 'October', 'November', 'December'];
+
+function ordinalSuffix(n) {
+  if (n >= 11 && n <= 13) return 'th';
+  switch (n % 10) {
+    case 1: return 'st';
+    case 2: return 'nd';
+    case 3: return 'rd';
+    default: return 'th';
+  }
+}
+
+function formatTime12h(hh, mm) {
+  const hour12 = hh % 12 || 12;
+  const ampm = hh < 12 ? 'AM' : 'PM';
+  return `${hour12}:${pad2(mm)} ${ampm}`;
+}
+
 function updateTimeLabels() {
   const { y, m, d, hh, mm, doy } = getSelectedJDandEPJ();
   if (yearBig) yearBig.textContent = astroYearToLabel(y);
-  doyLabel.textContent = `${pad2(m)}-${pad2(d)} (DOY ${doy})`;
-  timeLabel.textContent = `${pad2(hh)}:${pad2(mm)} UTC`;
+  doyLabel.textContent = `${MONTH_NAMES[m - 1]} ${d}${ordinalSuffix(d)}`;
+  timeLabel.textContent = formatTime12h(hh, mm);
 }
 
 function setDefaults() {
@@ -1580,15 +1757,26 @@ function applySnapMode() {
   const mode = document.querySelector('input[name="snapMode"]:checked').value;
   const y = Number(yearInput.value);
 
-  if (mode === 'dawn') {
+  const doyGroup = document.getElementById('doyGroup');
+  const timeGroup = document.getElementById('timeGroup');
+
+  if (mode === 'none') {
+    // No lock - sliders are freely adjustable
+    doyGroup.classList.remove('locked');
+    timeGroup.classList.remove('locked');
+  } else if (mode === 'dawn') {
     // Summer solstice dawn (6:00 AM)
     doySlider.value = '172';
     timeSlider.value = '6';
-  } else {
+    doyGroup.classList.add('locked');
+    timeGroup.classList.add('locked');
+  } else if (mode === 'culmination') {
     // Alnilam culmination - find when it transits closest to midnight
     const { doy, time } = findAlnilamCulmination(y);
     doySlider.value = String(doy);
     timeSlider.value = time.toFixed(2);
+    doyGroup.classList.add('locked');
+    timeGroup.classList.add('locked');
   }
 
   updateTimeLabels();
@@ -1696,9 +1884,7 @@ async function findAlignment() {
   if (alignmentSearchActive) return;
   alignmentSearchActive = true;
 
-  const btn = document.getElementById('btnFindAlignment');
-  btn.disabled = true;
-  btn.textContent = 'SEARCHING...';
+  console.log('=== FINDING ALIGNMENT ===');
 
   // Switch to "Alnilam highest" mode
   const culminationRadio = document.querySelector('input[name="snapMode"][value="culmination"]');
@@ -1755,53 +1941,80 @@ async function findAlignment() {
   }
 
   // Done
-  btn.disabled = false;
-  btn.textContent = 'FIND ALIGNMENT';
   alignmentSearchActive = false;
 
-  console.log('=== COMPLETE ===');
+  console.log('=== ALIGNMENT SEARCH COMPLETE ===');
   console.log(`Final: year ${year}, error ${currentError.toFixed(2)}°, iterations: ${iterations}`);
 
   const resultYear = astroYearToLabel(year);
   alert(`Alignment found at ${resultYear}\nError: ${currentError.toFixed(2)}°`);
 }
 
-document.getElementById('btnFindAlignment').addEventListener('click', findAlignment);
+// findAlignment() can be called programmatically from console
+
+// -----------------------------
+// Fullscreen Toggle
+// -----------------------------
+document.getElementById('btnFullscreen').addEventListener('click', () => {
+  document.body.classList.add('fullscreen-mode');
+});
+
+document.getElementById('btnCollapse').addEventListener('click', () => {
+  document.body.classList.remove('fullscreen-mode');
+});
 
 // -----------------------------
 // Presets
 // -----------------------------
-const PRESETS = {
-  sphinx47k: {
-    year: -47234,
-    origin: "sphinx",
-    snapMode: "dawn",
-    camera: {
-      position: [-1745.4, -678.4, 434.1],
-      target: [0.0, 0.0, 60.0]
-    }
-  },
-  sphinx25k: {
-    year: -25543,
-    origin: "sphinx",
-    snapMode: "dawn",
-    camera: {
-      position: [-1745.4, -678.4, 434.1],
-      target: [0.0, 0.0, 60.0]
-    }
-  },
-  khufu2600: {
-    year: -2672,
-    origin: "khufu",
-    snapMode: "culmination",
-    camera: {
-      position: [-2188.9, 4083.5, 60.0],
-      target: [0.0, 0.0, 60.0]
-    }
-  }
+// Presets loaded from external JSON file
+let PRESETS = {};
+
+const PRESET_LABELS = {
+  sphinx47k: 'Sphinx 47k BC',
+  sphinx25k: 'Sphinx 25k BC',
+  khufu2600: 'Khufu 2500 BC'
 };
 
+function renderPresetMarkers() {
+  const container = document.getElementById('presetMarkers');
+  if (!container) return;
+  container.innerHTML = '';
+
+  for (const [key, preset] of Object.entries(PRESETS)) {
+    const sliderPos = yearToSlider(preset.year) / 10; // 0-100%
+
+    const marker = document.createElement('div');
+    marker.className = 'preset-marker';
+    marker.style.left = sliderPos + '%';
+
+    const btn = document.createElement('button');
+    btn.className = 'preset-marker-btn';
+    btn.textContent = PRESET_LABELS[key] || key;
+    btn.addEventListener('click', () => applyPreset(preset));
+
+    const line = document.createElement('div');
+    line.className = 'preset-marker-line';
+
+    marker.appendChild(btn);
+    marker.appendChild(line);
+    container.appendChild(marker);
+  }
+}
+
+fetch('presets.json')
+  .then(response => response.json())
+  .then(data => {
+    PRESETS = data;
+    console.log('Presets loaded:', Object.keys(PRESETS));
+    renderPresetMarkers();
+  })
+  .catch(err => console.error('Failed to load presets:', err));
+
 function applyPreset(preset) {
+  if (!preset) {
+    console.warn('Preset not yet loaded');
+    return;
+  }
   // Set origin
   currentOriginKey = preset.origin;
   document.querySelector(`input[name="origin"][value="${preset.origin}"]`).checked = true;
@@ -1825,18 +2038,7 @@ function applyPreset(preset) {
   console.log(`=== PRESET APPLIED: ${preset.year} ===`);
 }
 
-document.getElementById('btnPresetSphinx47k').addEventListener('click', () => {
-  applyPreset(PRESETS.sphinx47k);
-});
-
-document.getElementById('btnPresetSphinx25k').addEventListener('click', () => {
-  applyPreset(PRESETS.sphinx25k);
-});
-
-document.getElementById('btnPresetKhufu2600').addEventListener('click', () => {
-  applyPreset(PRESETS.khufu2600);
-});
-
+// Preset buttons are now rendered on the timeline bar via renderPresetMarkers()
 
 // -----------------------------
 // Start
@@ -1845,6 +2047,7 @@ setDefaults();
 renderTickScale();
 renderDynastyTrack();
 applyOrigin();
+applySnapMode();  // Initialize lock state based on default snap mode
 try {
   await loadSkyData();
 } catch (err) {

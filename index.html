@@ -24,43 +24,73 @@
     <input id="yearInput" type="number" class="mono" />
   </div>
   <div id="hud">
-    <div class="row small" id="originRow">
-      <label><input type="radio" name="origin" value="khufu" checked /> Khufu</label>
-      <label><input type="radio" name="origin" value="sphinx" /> Sphinx</label>
+    <!-- Fullscreen Toggle -->
+    <button id="btnFullscreen" class="fullscreen-btn" type="button">Enter Fullscreen</button>
+
+    <!-- TIME Section -->
+    <div class="hud-section">
+      <div class="section-header">Time</div>
+      <div class="slider-group" id="doyGroup">
+        <div class="slider-header">
+          <span class="slider-title">Day of Year</span>
+          <span id="doyLabel" class="slider-value">—</span>
+        </div>
+        <input id="doySlider" type="range" min="1" max="366" step="1" />
+      </div>
+      <div class="slider-group" id="timeGroup">
+        <div class="slider-header">
+          <span class="slider-title">Time (UTC)</span>
+          <span id="timeLabel" class="slider-value">—</span>
+        </div>
+        <input id="timeSlider" type="range" min="0" max="24" step="0.05" />
+      </div>
     </div>
 
-    <div class="row small">
-      <label><input type="checkbox" id="chkFullGlobe" checked /> Show full globe</label>
+    <!-- LOCKS Section -->
+    <div class="hud-section">
+      <div class="section-header">Locks</div>
+      <div class="toggle-group">
+        <label class="toggle-box lock-toggle">
+          <input type="radio" name="snapMode" value="none" checked />
+          <span class="toggle-label">None</span>
+        </label>
+        <label class="toggle-box lock-toggle">
+          <input type="radio" name="snapMode" value="dawn" />
+          <span class="lock-icon">🔒</span>
+          <span class="toggle-label">Solstice Dawn</span>
+        </label>
+        <label class="toggle-box lock-toggle">
+          <input type="radio" name="snapMode" value="culmination" />
+          <span class="lock-icon">🔒</span>
+          <span class="toggle-label">Alnilam Highest</span>
+        </label>
+      </div>
     </div>
 
-    <div class="row small">
-      <label><input type="radio" name="snapMode" value="dawn" /> Solstice dawn</label>
-      <label><input type="radio" name="snapMode" value="culmination" checked /> Alnilam highest</label>
-    </div>
-
-    <div class="row">
-      <button id="btnFindAlignment" class="btn" type="button">FIND ALIGNMENT</button>
-    </div>
-
-    <div class="row">
-      <button id="btnPresetKhufu2600" class="btn preset-btn" type="button">Khufu Alignment: 2600 BC</button>
-    </div>
-    <div class="row">
-      <button id="btnPresetSphinx25k" class="btn preset-btn" type="button">Sphinx Alignment: 25k BC</button>
-      <button id="btnPresetSphinx47k" class="btn preset-btn" type="button">Sphinx Alignment: 47k BC</button>
+    <!-- SETTINGS Section -->
+    <div class="hud-section">
+      <div class="section-header">Settings</div>
+      <div class="toggle-group">
+        <label class="toggle-box">
+          <input type="radio" name="origin" value="khufu" checked />
+          <span class="toggle-label">Khufu</span>
+        </label>
+        <label class="toggle-box">
+          <input type="radio" name="origin" value="sphinx" />
+          <span class="toggle-label">Sphinx</span>
+        </label>
+      </div>
     </div>
 
     <div class="row small" id="loadStatus"></div>
-
-    <!-- Hidden elements for JS compatibility -->
-    <input id="doySlider" type="range" min="1" max="366" step="1" style="display:none" />
-    <input id="timeSlider" type="range" min="0" max="24" step="0.05" style="display:none" />
     <span id="coordDec" style="display:none"></span>
-    <span id="doyLabel" style="display:none"></span>
-    <span id="timeLabel" style="display:none"></span>
   </div>
 
+  <!-- Floating collapse button (visible in fullscreen mode) -->
+  <button id="btnCollapse" class="collapse-btn" type="button">Exit Fullscreen</button>
+
   <div id="timelineBar">
+    <div id="presetMarkers"></div>
     <div id="tickScale"></div>
     <div id="dynastyTrack"></div>
     <input id="yearSlider" type="range" min="0" max="1000" step="1" />

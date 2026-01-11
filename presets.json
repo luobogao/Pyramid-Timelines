@@ -1,0 +1,29 @@
+{
+  "sphinx47k": {
+    "year": -47234,
+    "origin": "sphinx",
+    "snapMode": "dawn",
+    "camera": {
+      "position": [-1745.4, -678.4, 434.1],
+      "target": [0.0, 0.0, 60.0]
+    }
+  },
+  "sphinx25k": {
+    "year": -25543,
+    "origin": "sphinx",
+    "snapMode": "dawn",
+    "camera": {
+      "position": [-1745.4, -678.4, 434.1],
+      "target": [0.0, 0.0, 60.0]
+    }
+  },
+  "khufu2600": {
+    "year": -2492,
+    "origin": "khufu",
+    "snapMode": "culmination",
+    "camera": {
+      "position": [-2188.9, 4083.5, 60.0],
+      "target": [0.0, 0.0, 60.0]
+    }
+  }
+}
