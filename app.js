@@ -23,6 +23,15 @@ const ORIGIN_SITES = {
 let currentOriginKey = "khufu";
 let REF_LAT_DEG = ORIGIN_SITES[currentOriginKey].lat;
 let REF_LON_DEG = ORIGIN_SITES[currentOriginKey].lon;
+let showFullGlobe = true;  // When true, show all stars; when false, hide near-side stars
+let currentNearestZodiac = null;  // Nearest zodiac constellation to Sphinx sight line
+
+// Zodiac constellation names for display
+const ZODIAC_NAMES = {
+  'Ari': 'Aries', 'Tau': 'Taurus', 'Gem': 'Gemini', 'Cnc': 'Cancer',
+  'Leo': 'Leo', 'Vir': 'Virgo', 'Lib': 'Libra', 'Sco': 'Scorpio',
+  'Sgr': 'Sagittarius', 'Cap': 'Capricorn', 'Aqr': 'Aquarius', 'Psc': 'Pisces'
+};
 
 // -----------------------------
 // Egyptian dynasties for timeline visualization
@@ -79,6 +88,11 @@ controls.addEventListener('end', () => {
   console.log('=== CAMERA STATE ===');
   console.log(`camera.position.set(${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)});`);
   console.log(`controls.target.set(${controls.target.x.toFixed(1)}, ${controls.target.y.toFixed(1)}, ${controls.target.z.toFixed(1)});`);
+});
+
+// Update sky visibility when camera moves (for back-face culling of stars/constellations)
+controls.addEventListener('change', () => {
+  scheduleSkyUpdate();
 });
 
 // -----------------------------
@@ -967,17 +981,26 @@ function updateSkyForJD(jd, epj) {
   if (starPoints) {
     const posAttr = starPoints.geometry.getAttribute('position');
     const colAttr = starPoints.geometry.getAttribute('color');
+    const camPos = camera.position;
 
     for (let i = 0; i < starsData.length; i++) {
       const s = starsData[i];
       const v = equatorialJ2000ToHorizontalUnit(s.raRad, s.decRad, jd, latRad, lonRad, rp);
       const idx = i * 3;
-      posAttr.array[idx+0] = v.x * SKY_RADIUS;
-      posAttr.array[idx+1] = v.y * SKY_RADIUS;
-      posAttr.array[idx+2] = v.z * SKY_RADIUS;
+      const sx = v.x * SKY_RADIUS;
+      const sy = v.y * SKY_RADIUS;
+      const sz = v.z * SKY_RADIUS;
+      posAttr.array[idx+0] = sx;
+      posAttr.array[idx+1] = sy;
+      posAttr.array[idx+2] = sz;
+
+      // Check if star is on the far side of the sphere (opposite from camera)
+      // We hide stars on the near side that we'd "look through" to see the far side
+      const dotCam = sx * camPos.x + sy * camPos.y + sz * camPos.z;
+      const isVisible = showFullGlobe || dotCam < 0;
 
       const inten = magToIntensity(s.mag);
-      const ink = 0.10 + (1.0 - inten) * 0.55; // 0.10 (black-ish) .. 0.65 (mid-gray)
+      const ink = isVisible ? (0.10 + (1.0 - inten) * 0.55) : 1.0; // invisible = white (blends with background)
       colAttr.array[idx+0] = ink;
       colAttr.array[idx+1] = ink;
       colAttr.array[idx+2] = ink;
@@ -990,6 +1013,7 @@ function updateSkyForJD(jd, epj) {
   if (constLines) {
     const posAttr = constLines.geometry.getAttribute('position');
     const colAttr = constLines.geometry.getAttribute('color');
+    const camPos = camera.position;
 
     // Zodiac constellation IDs (IAU abbreviations)
     const ZODIAC = new Set(['Ari', 'Tau', 'Gem', 'Cnc', 'Leo', 'Vir', 'Lib', 'Sco', 'Sgr', 'Cap', 'Aqr', 'Psc']);
@@ -1025,6 +1049,9 @@ function updateSkyForJD(jd, epj) {
       }
     }
 
+    // Store nearest zodiac for angle readout display
+    currentNearestZodiac = nearestConstId;
+
     // Second pass: write positions and colors
     let w = 0;
     let c = 0;
@@ -1038,11 +1065,17 @@ function updateSkyForJD(jd, epj) {
       posAttr.array[w++] = p2.y;
       posAttr.array[w++] = p2.z;
 
-      // Color: red if nearest constellation in Sphinx mode, else black
+      // Check if segment is on the far side of the sphere (opposite from camera)
+      // Hide if both endpoints are on the near side (that we'd look through)
+      const dot1 = p1.x * camPos.x + p1.y * camPos.y + p1.z * camPos.z;
+      const dot2 = p2.x * camPos.x + p2.y * camPos.y + p2.z * camPos.z;
+      const isVisible = showFullGlobe || dot1 < 0 || dot2 < 0;  // Show if full globe or at least one endpoint on far side
+
+      // Color: red if nearest constellation in Sphinx mode, else black; white if hidden
       const isHighlighted = (currentOriginKey === 'sphinx' && constId === nearestConstId);
-      const r = isHighlighted ? 0.85 : 0.0;
-      const g = 0.0;
-      const b = 0.0;
+      const r = isVisible ? (isHighlighted ? 0.85 : 0.0) : 1.0;
+      const g = isVisible ? 0.0 : 1.0;
+      const b = isVisible ? 0.0 : 1.0;
 
       // Both vertices of the segment get same color
       colAttr.array[c++] = r; colAttr.array[c++] = g; colAttr.array[c++] = b;
@@ -1068,7 +1101,15 @@ function updateSkyForJD(jd, epj) {
     if (az < 0) az += Math.PI * 2;
     const alt = Math.asin(Math.max(-1, Math.min(1, dir.z)));
 
-    angleEl.innerHTML = `AZ ${rad2deg(az).toFixed(1)}°<div class="sub">ALT ${rad2deg(alt).toFixed(1)}°</div>`;
+    // Update angle readout based on origin
+    if (currentOriginKey === 'sphinx' && currentNearestZodiac) {
+      // Sphinx mode: show nearest zodiac constellation name
+      const zodiacName = ZODIAC_NAMES[currentNearestZodiac] || currentNearestZodiac;
+      angleEl.innerHTML = `<div class="sub">ZODIAC</div>${zodiacName}`;
+    } else {
+      // Khufu mode: show Alnilam azimuth/altitude
+      angleEl.innerHTML = `AZ ${rad2deg(az).toFixed(1)}°<div class="sub">ALT ${rad2deg(alt).toFixed(1)}°</div>`;
+    }
 
     // Update error arc between Alnilam and shaft
     updateErrorArc(dir);
@@ -1132,6 +1173,14 @@ function applyOrigin() {
 
   scheduleSkyUpdate();
 }
+
+// Full globe toggle
+document.getElementById('chkFullGlobe').addEventListener('change', (e) => {
+  showFullGlobe = e.target.checked;
+  console.log('=== FULL GLOBE ===');
+  console.log(`showFullGlobe = ${showFullGlobe};`);
+  scheduleSkyUpdate();
+});
 
 originRadios.forEach(r => {
   r.addEventListener('change', () => {
