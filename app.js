@@ -71,7 +71,15 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.minDistance = 20;
 controls.maxDistance = 12000;
+controls.maxPolarAngle = Math.PI / 2;  // Prevent camera from going below ground
 controls.update();
+
+// Log camera state on user interaction
+controls.addEventListener('end', () => {
+  console.log('=== CAMERA STATE ===');
+  console.log(`camera.position.set(${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)});`);
+  console.log(`controls.target.set(${controls.target.x.toFixed(1)}, ${controls.target.y.toFixed(1)}, ${controls.target.z.toFixed(1)});`);
+});
 
 // -----------------------------
 // Helpers
@@ -317,22 +325,49 @@ const sphinxSightDir = new THREE.Vector3(
 ).normalize();
 
 const SPHINX_SIGHT_LENGTH = SKY_RADIUS;  // extend to sky sphere
-const SPHINX_SIGHT_RADIUS = 2.0;
-const sphinxSightGeom = new THREE.CylinderGeometry(1, 1, 1, 18, 1, true);
-const sphinxSightMat = new THREE.MeshBasicMaterial({ color: 0x0055aa, depthTest: false, depthWrite: false });
-const sphinxSightLine = new THREE.Mesh(sphinxSightGeom, sphinxSightMat);
+
+// Dashed line from Sphinx head to sky sphere
+const sphinxLineStart = new THREE.Vector3(SPHINX_X, SPHINX_Y, 10);  // Sphinx head
+const sphinxLineEnd = new THREE.Vector3(
+  SPHINX_X + sphinxSightDir.x * SPHINX_SIGHT_LENGTH,
+  SPHINX_Y + sphinxSightDir.y * SPHINX_SIGHT_LENGTH,
+  10 + sphinxSightDir.z * SPHINX_SIGHT_LENGTH
+);
+const sphinxSightGeom = new THREE.BufferGeometry().setFromPoints([sphinxLineStart, sphinxLineEnd]);
+const sphinxSightMat = new THREE.LineDashedMaterial({
+  color: 0x0088ff,
+  dashSize: 30,
+  gapSize: 15,
+  depthTest: false,
+  depthWrite: false
+});
+const sphinxSightLine = new THREE.Line(sphinxSightGeom, sphinxSightMat);
+sphinxSightLine.computeLineDistances();  // Required for dashed lines
 sphinxSightLine.frustumCulled = false;
 sphinxSightLine.renderOrder = 9997;
-sphinxSightLine.scale.set(SPHINX_SIGHT_RADIUS, SPHINX_SIGHT_LENGTH, SPHINX_SIGHT_RADIUS);
-sphinxSightLine.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), sphinxSightDir);
-// Position at Sphinx center, offset so line extends outward from Sphinx head
-sphinxSightLine.position.set(
-  SPHINX_X + sphinxSightDir.x * (SPHINX_SIGHT_LENGTH / 2),
-  SPHINX_Y + sphinxSightDir.y * (SPHINX_SIGHT_LENGTH / 2),
-  10 + sphinxSightDir.z * (SPHINX_SIGHT_LENGTH / 2)  // Start at Sphinx head height (~10m)
-);
 sphinxSightLine.visible = false;  // Hidden by default (Khufu is default origin)
 world.add(sphinxSightLine);
+
+// Circle at the end of the Sphinx sight line (where it hits the sky sphere)
+const SPHINX_RING_RADIUS = 60;
+const sphinxRingGeom = new THREE.RingGeometry(SPHINX_RING_RADIUS - 8, SPHINX_RING_RADIUS, 48);
+const sphinxRingMat = new THREE.MeshBasicMaterial({
+  color: 0x0088ff,
+  side: THREE.DoubleSide,
+  transparent: true,
+  opacity: 0.7,
+  depthTest: false,
+  depthWrite: false
+});
+const sphinxRing = new THREE.Mesh(sphinxRingGeom, sphinxRingMat);
+// Position at sky sphere intersection
+sphinxRing.position.copy(sphinxLineEnd);
+// Orient ring to face along the sight direction
+sphinxRing.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), sphinxSightDir);
+sphinxRing.frustumCulled = false;
+sphinxRing.renderOrder = 9996;
+sphinxRing.visible = false;
+world.add(sphinxRing);
 
 
 function makeTextSprite(text) {
@@ -1053,6 +1088,27 @@ const doyLabel   = document.getElementById('doyLabel');
 const timeSlider = document.getElementById('timeSlider');
 const timeLabel  = document.getElementById('timeLabel');
 
+// Exponential year mapping: more resolution near present, less in distant past
+const YEAR_MIN = -100000;
+const YEAR_MAX = 2026;
+const YEAR_EXPONENT = 0.2;  // Lower = more resolution near present
+
+// Convert slider (0-1000) to year using exponential mapping
+function sliderToYear(sliderVal) {
+  const t = sliderVal / 1000;  // 0 to 1
+  // t^exponent gives more slider range to recent years
+  const yearRange = YEAR_MAX - YEAR_MIN;
+  return Math.round(YEAR_MIN + yearRange * Math.pow(t, YEAR_EXPONENT));
+}
+
+// Convert year to slider value (inverse of above)
+function yearToSlider(year) {
+  const yearRange = YEAR_MAX - YEAR_MIN;
+  const normalized = (year - YEAR_MIN) / yearRange;  // 0 to 1
+  const t = Math.pow(Math.max(0, Math.min(1, normalized)), 1 / YEAR_EXPONENT);
+  return Math.round(t * 1000);
+}
+
 // -----------------------------
 // Origin selection (which pyramid base center is treated as (0,0,0))
 // -----------------------------
@@ -1072,6 +1128,7 @@ function applyOrigin() {
   alnilamBeam.visible = (currentOriginKey === 'khufu');
   errorArc.visible = (currentOriginKey === 'khufu');
   sphinxSightLine.visible = (currentOriginKey === 'sphinx');
+  sphinxRing.visible = (currentOriginKey === 'sphinx');
 
   scheduleSkyUpdate();
 }
@@ -1080,7 +1137,19 @@ originRadios.forEach(r => {
   r.addEventListener('change', () => {
     if (!r.checked) return;
     currentOriginKey = r.value;
+
+    // Auto-select appropriate snap mode based on origin
+    if (currentOriginKey === 'khufu') {
+      document.querySelector('input[name="snapMode"][value="culmination"]').checked = true;
+    } else if (currentOriginKey === 'sphinx') {
+      document.querySelector('input[name="snapMode"][value="dawn"]').checked = true;
+    }
+
+    console.log('=== ORIGIN CHANGED ===');
+    console.log(`currentOriginKey = "${currentOriginKey}";`);
+
     applyOrigin();
+    applySnapMode();
   });
 });
 
@@ -1273,10 +1342,9 @@ function updateTimeLabels() {
 function setDefaults() {
   const now = new Date();
   const currentYear = now.getUTCFullYear();
-  yearSlider.min = String(currentYear - 40000);
-  yearSlider.max = String(currentYear);
-  yearSlider.value = String(currentYear);
 
+  // Set slider to current year using exponential mapping
+  yearSlider.value = String(yearToSlider(currentYear));
   yearInput.value = String(currentYear);
 
   const doy = doyFromMonthDay(currentYear, now.getUTCMonth() + 1, now.getUTCDate());
@@ -1292,23 +1360,21 @@ function renderDynastyTrack() {
   const track = document.getElementById('dynastyTrack');
   if (!track) return;
 
-  const min = Number(yearSlider.min);
-  const max = Number(yearSlider.max);
-  const range = max - min;
-
   track.innerHTML = '';
 
   for (const d of DYNASTIES) {
-    const left = ((d.start - min) / range) * 100;
-    const width = ((d.end - d.start) / range) * 100;
+    // Convert years to slider positions (0-100%)
+    const leftSlider = yearToSlider(d.start) / 10;  // 0-100%
+    const rightSlider = yearToSlider(d.end) / 10;
+    const width = rightSlider - leftSlider;
 
     // Skip if completely outside visible range
-    if (left + width < 0 || left > 100) continue;
+    if (rightSlider < 0 || leftSlider > 100) continue;
 
     const el = document.createElement('div');
     el.className = 'dynasty';
-    el.style.left = Math.max(0, left) + '%';
-    el.style.width = Math.min(100 - Math.max(0, left), width) + '%';
+    el.style.left = Math.max(0, leftSlider) + '%';
+    el.style.width = Math.min(100 - Math.max(0, leftSlider), width) + '%';
     el.style.background = d.color;
     el.textContent = d.name;
     el.title = `${d.name}: ${Math.abs(d.start)} BCE – ${d.end < 0 ? Math.abs(d.end) + ' BCE' : d.end + ' CE'}`;
@@ -1316,12 +1382,98 @@ function renderDynastyTrack() {
   }
 }
 
+function renderTickScale() {
+  const scale = document.getElementById('tickScale');
+  if (!scale) return;
+
+  scale.innerHTML = '';
+
+  // Generate tick marks at various intervals
+  // Major: every 10,000 years
+  // Medium: every 5,000 years (not already a major)
+  // Minor: every 1,000 years (not already major or medium)
+
+  const ticks = [];
+
+  // Collect all tick positions
+  for (let year = YEAR_MIN; year <= YEAR_MAX; year += 1000) {
+    let tickType = 'minor';
+    if (year % 10000 === 0) tickType = 'major';
+    else if (year % 5000 === 0) tickType = 'medium';
+
+    const sliderPos = yearToSlider(year) / 10;  // 0-100%
+
+    // Skip if out of range
+    if (sliderPos < 0 || sliderPos > 100) continue;
+
+    ticks.push({ year, sliderPos, tickType });
+  }
+
+  // Add year 0 and current year if not already included
+  if (!ticks.find(t => t.year === 0)) {
+    ticks.push({ year: 0, sliderPos: yearToSlider(0) / 10, tickType: 'major' });
+  }
+  if (!ticks.find(t => t.year === 2000)) {
+    ticks.push({ year: 2000, sliderPos: yearToSlider(2000) / 10, tickType: 'major' });
+  }
+
+  // Filter ticks that are too close together
+  // For minor ticks, only show if they're at least 2% apart from neighbors
+  const filteredTicks = [];
+  ticks.sort((a, b) => a.sliderPos - b.sliderPos);
+
+  for (let i = 0; i < ticks.length; i++) {
+    const tick = ticks[i];
+
+    // Always include major and medium ticks
+    if (tick.tickType === 'major' || tick.tickType === 'medium') {
+      filteredTicks.push(tick);
+      continue;
+    }
+
+    // For minor ticks, check spacing
+    const prevPos = i > 0 ? ticks[i - 1].sliderPos : -Infinity;
+    const nextPos = i < ticks.length - 1 ? ticks[i + 1].sliderPos : Infinity;
+
+    if (tick.sliderPos - prevPos > 1.5 && nextPos - tick.sliderPos > 1.5) {
+      filteredTicks.push(tick);
+    }
+  }
+
+  // Render ticks
+  for (const tick of filteredTicks) {
+    const el = document.createElement('div');
+    el.className = 'tick';
+    el.style.left = tick.sliderPos + '%';
+
+    const line = document.createElement('div');
+    line.className = 'tick-line ' + tick.tickType;
+    el.appendChild(line);
+
+    // Add label for major ticks only
+    if (tick.tickType === 'major') {
+      const label = document.createElement('div');
+      label.className = 'tick-label';
+      if (tick.year < 0) {
+        label.textContent = Math.abs(tick.year / 1000) + 'k';
+      } else if (tick.year === 0) {
+        label.textContent = '0';
+      } else {
+        label.textContent = (tick.year / 1000) + 'k';
+      }
+      el.appendChild(label);
+    }
+
+    scale.appendChild(el);
+  }
+}
+
 function syncYearFromInput() {
   let y = Number(yearInput.value);
-  if (!Number.isFinite(y)) y = Number(yearSlider.value);
-  y = Math.max(Number(yearSlider.min), Math.min(Number(yearSlider.max), Math.round(y)));
+  if (!Number.isFinite(y)) y = sliderToYear(Number(yearSlider.value));
+  y = Math.max(YEAR_MIN, Math.min(YEAR_MAX, Math.round(y)));
   yearInput.value = String(y);
-  yearSlider.value = String(y);
+  yearSlider.value = String(yearToSlider(y));
   updateTimeLabels();
   scheduleSkyUpdate();
 }
@@ -1379,11 +1531,7 @@ function applySnapMode() {
   const mode = document.querySelector('input[name="snapMode"]:checked').value;
   const y = Number(yearInput.value);
 
-  if (mode === 'solstice') {
-    // Summer solstice midnight - only change what's needed
-    doySlider.value = '172';
-    timeSlider.value = '0';
-  } else if (mode === 'dawn') {
+  if (mode === 'dawn') {
     // Summer solstice dawn (6:00 AM)
     doySlider.value = '172';
     timeSlider.value = '6';
@@ -1400,22 +1548,62 @@ function applySnapMode() {
 
 // Snap mode radio buttons - apply immediately when clicked
 document.querySelectorAll('input[name="snapMode"]').forEach(radio => {
-  radio.addEventListener('change', applySnapMode);
+  radio.addEventListener('change', () => {
+    console.log('=== SNAP MODE CHANGED ===');
+    console.log(`snapMode = "${radio.value}";`);
+    applySnapMode();
+  });
 });
 
 yearSlider.addEventListener('input', () => {
-  // Snap to 95-year increments
-  let y = Number(yearSlider.value);
-  y = Math.round(y / 95) * 95;
+  // Convert slider position to year using exponential mapping
+  const y = sliderToYear(Number(yearSlider.value));
   yearInput.value = String(y);
 
   applySnapMode();
 });
 
+yearSlider.addEventListener('change', () => {
+  const y = Number(yearInput.value);
+  const snapMode = document.querySelector('input[name="snapMode"]:checked').value;
+  console.log('=== YEAR CHANGED ===');
+  console.log(`year = ${y};`);
+  console.log(`// Full preset state:`);
+  console.log(`{ year: ${y}, origin: "${currentOriginKey}", snapMode: "${snapMode}", camera: { pos: [${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)}], target: [${controls.target.x.toFixed(1)}, ${controls.target.y.toFixed(1)}, ${controls.target.z.toFixed(1)}] } }`);
+});
+
 yearInput.addEventListener('change', () => {
   syncYearFromInput();
   scheduleSkyUpdate();
+
+  const y = Number(yearInput.value);
+  const snapMode = document.querySelector('input[name="snapMode"]:checked').value;
+  console.log('=== YEAR INPUT CHANGED ===');
+  console.log(`year = ${y};`);
 });
+
+// Helper function to log full state - call from console: logState()
+window.logState = function() {
+  const y = Number(yearInput.value);
+  const snapMode = document.querySelector('input[name="snapMode"]:checked').value;
+  const doy = Number(doySlider.value);
+  const time = Number(timeSlider.value);
+
+  console.log('=== FULL STATE ===');
+  console.log(`const PRESET = {`);
+  console.log(`  year: ${y},`);
+  console.log(`  doy: ${doy},`);
+  console.log(`  time: ${time.toFixed(2)},`);
+  console.log(`  origin: "${currentOriginKey}",`);
+  console.log(`  snapMode: "${snapMode}",`);
+  console.log(`  camera: {`);
+  console.log(`    position: [${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)}],`);
+  console.log(`    target: [${controls.target.x.toFixed(1)}, ${controls.target.y.toFixed(1)}, ${controls.target.z.toFixed(1)}]`);
+  console.log(`  }`);
+  console.log(`};`);
+
+  return { year: y, doy, time, origin: currentOriginKey, snapMode, camera: { position: camera.position.toArray(), target: controls.target.toArray() } };
+};
 
 doySlider.addEventListener('input', () => {
   updateTimeLabels();
@@ -1467,8 +1655,6 @@ async function findAlignment() {
   const culminationRadio = document.querySelector('input[name="snapMode"][value="culmination"]');
   if (culminationRadio) culminationRadio.checked = true;
 
-  const minYear = Number(yearSlider.min);
-  const maxYear = Number(yearSlider.max);
   const stepSize = 100; // Always 100 years
   const targetError = 0.5;
 
@@ -1504,14 +1690,14 @@ async function findAlignment() {
     }
 
     // Clamp to valid range
-    year = Math.max(minYear, Math.min(maxYear, year));
+    year = Math.max(YEAR_MIN, Math.min(YEAR_MAX, year));
 
     // Update UI
     const { doy, time } = findAlnilamCulmination(year);
     doySlider.value = String(doy);
     timeSlider.value = time.toFixed(2);
     yearInput.value = String(year);
-    yearSlider.value = String(year);
+    yearSlider.value = String(yearToSlider(year));
     updateTimeLabels();
     scheduleSkyUpdate();
 
@@ -1533,11 +1719,81 @@ async function findAlignment() {
 
 document.getElementById('btnFindAlignment').addEventListener('click', findAlignment);
 
+// -----------------------------
+// Presets
+// -----------------------------
+const PRESETS = {
+  sphinx47k: {
+    year: -47234,
+    origin: "sphinx",
+    snapMode: "dawn",
+    camera: {
+      position: [-1745.4, -678.4, 434.1],
+      target: [0.0, 0.0, 60.0]
+    }
+  },
+  sphinx25k: {
+    year: -25543,
+    origin: "sphinx",
+    snapMode: "dawn",
+    camera: {
+      position: [-1745.4, -678.4, 434.1],
+      target: [0.0, 0.0, 60.0]
+    }
+  },
+  khufu2600: {
+    year: -2672,
+    origin: "khufu",
+    snapMode: "culmination",
+    camera: {
+      position: [-2188.9, 4083.5, 60.0],
+      target: [0.0, 0.0, 60.0]
+    }
+  }
+};
+
+function applyPreset(preset) {
+  // Set origin
+  currentOriginKey = preset.origin;
+  document.querySelector(`input[name="origin"][value="${preset.origin}"]`).checked = true;
+  applyOrigin();
+
+  // Set snap mode
+  document.querySelector(`input[name="snapMode"][value="${preset.snapMode}"]`).checked = true;
+
+  // Set year
+  yearInput.value = String(preset.year);
+  yearSlider.value = String(yearToSlider(preset.year));
+
+  // Apply snap mode (sets doy and time)
+  applySnapMode();
+
+  // Set camera
+  camera.position.set(...preset.camera.position);
+  controls.target.set(...preset.camera.target);
+  controls.update();
+
+  console.log(`=== PRESET APPLIED: ${preset.year} ===`);
+}
+
+document.getElementById('btnPresetSphinx47k').addEventListener('click', () => {
+  applyPreset(PRESETS.sphinx47k);
+});
+
+document.getElementById('btnPresetSphinx25k').addEventListener('click', () => {
+  applyPreset(PRESETS.sphinx25k);
+});
+
+document.getElementById('btnPresetKhufu2600').addEventListener('click', () => {
+  applyPreset(PRESETS.khufu2600);
+});
+
 
 // -----------------------------
 // Start
 // -----------------------------
 setDefaults();
+renderTickScale();
 renderDynastyTrack();
 applyOrigin();
 try {
@@ -1553,6 +1809,11 @@ try {
 function animate() {
   requestAnimationFrame(animate);
   controls.update();
+
+  // Animate Sphinx sight line dashes (move toward sky sphere)
+  if (sphinxSightLine.visible) {
+    sphinxSightMat.dashOffset -= 0.5;
+  }
 
   if (pendingSkyUpdate && starPoints && constLines) {
     pendingSkyUpdate = false;

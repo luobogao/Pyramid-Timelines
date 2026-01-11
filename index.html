@@ -30,13 +30,20 @@
     </div>
 
     <div class="row small">
-      <label><input type="radio" name="snapMode" value="solstice" checked /> Solstice midnight</label>
       <label><input type="radio" name="snapMode" value="dawn" /> Solstice dawn</label>
-      <label><input type="radio" name="snapMode" value="culmination" /> Alnilam highest</label>
+      <label><input type="radio" name="snapMode" value="culmination" checked /> Alnilam highest</label>
     </div>
 
     <div class="row">
       <button id="btnFindAlignment" class="btn" type="button">FIND ALIGNMENT</button>
+    </div>
+
+    <div class="row">
+      <button id="btnPresetKhufu2600" class="btn preset-btn" type="button">Khufu Alignment: 2600 BC</button>
+    </div>
+    <div class="row">
+      <button id="btnPresetSphinx25k" class="btn preset-btn" type="button">Sphinx Alignment: 25k BC</button>
+      <button id="btnPresetSphinx47k" class="btn preset-btn" type="button">Sphinx Alignment: 47k BC</button>
     </div>
 
     <div class="row small" id="loadStatus"></div>
@@ -50,8 +57,9 @@
   </div>
 
   <div id="timelineBar">
+    <div id="tickScale"></div>
     <div id="dynastyTrack"></div>
-    <input id="yearSlider" type="range" min="-40000" max="2026" step="95" />
+    <input id="yearSlider" type="range" min="0" max="1000" step="1" />
   </div>
 
   <script type="module" src="app.js"></script>
