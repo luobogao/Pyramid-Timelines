@@ -1810,9 +1810,38 @@ function syncYearFromInput() {
   scheduleSkyUpdate();
 }
 
+// Calculate exact transit time (hours from midnight) for a star on a given day
+function getExactTransitTime(jd0, raRad, lonRad) {
+  // Transit occurs when LST = RA
+  // LST = GMST + longitude
+  // GMST increases at ~360.9856°/day = 15.041°/hour in sidereal rate
+
+  const gmst0 = gmstRadians(jd0);  // GMST at start of day (midnight)
+  const lst0 = gmst0 + lonRad;     // LST at midnight
+
+  // Hour angle at midnight (how far past transit we are)
+  let hourAngle = lst0 - raRad;
+  // Normalize to [-π, π]
+  hourAngle = ((hourAngle + Math.PI) % (2 * Math.PI)) - Math.PI;
+  if (hourAngle < -Math.PI) hourAngle += 2 * Math.PI;
+
+  // Sidereal rate: 360.98564736629 deg/day = 15.04106864... deg/hour
+  const siderealRateRadPerHour = deg2rad(360.98564736629 / 24);
+
+  // Time until transit (negative hour angle means transit is in the future)
+  let transitHours = -hourAngle / siderealRateRadPerHour;
+
+  // Normalize to [0, 24) range
+  transitHours = ((transitHours % 24) + 24) % 24;
+
+  return transitHours;
+}
+
 // Find when Alnilam culminates (transits) closest to midnight for best visibility
 function findAlnilamCulmination(y) {
-  // Get precessed RA of Alnilam for this year
+  const lonRad = deg2rad(REF_LON_DEG);
+
+  // Compute precession once for mid-year (sufficient accuracy for day selection)
   const jdMid = julianDayFromYMDHMS(y, 6, 21, 0, 0, 0);
   const epj = 2000.0 + (jdMid - 2451545.0) / 365.25;
   const rp = ltp_PMAT(epj);
@@ -1820,40 +1849,27 @@ function findAlnilamCulmination(y) {
   const vD = matVec(rp, v0);
   const { ra } = vecToRaDec(vD);
 
-  const lonRad = deg2rad(REF_LON_DEG);
-
-  // Search each day of the year to find when transit is closest to midnight
+  // Find the day where transit occurs just after midnight (time in [0, ~4min])
+  // This ensures consistent day selection without jumping
   let bestDoy = 1;
-  let bestTime = 0;
-  let bestMidnightDist = Infinity;
+  let bestTime = 24; // Start with worst case
 
   for (let doy = 1; doy <= 365; doy++) {
     const { m, d } = monthDayFromDOY(y, doy);
     const jd0 = julianDayFromYMDHMS(y, m, d, 0, 0, 0);
 
-    // Find transit time on this day (when LST = RA)
-    for (let t = 0; t < 24; t += 0.1) {
-      const jd = jd0 + t / 24;
-      const gmst = gmstRadians(jd);
-      const lst = gmst + lonRad;
-      let diff = lst - ra;
-      // Normalize to [0, 2π] then find shortest angular distance
-      diff = ((diff % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-      if (diff > Math.PI) diff = 2 * Math.PI - diff;
+    // Calculate exact transit time analytically
+    const transitTime = getExactTransitTime(jd0, ra, lonRad);
 
-      if (diff < 0.02) { // close to transit
-        // Distance from midnight (0 or 24)
-        const midDist = Math.min(t, 24 - t);
-        if (midDist < bestMidnightDist) {
-          bestMidnightDist = midDist;
-          bestDoy = doy;
-          bestTime = t;
-        }
-        break; // found transit for this day
-      }
+    // We want the day where transit is just AFTER midnight (smallest positive time)
+    // This avoids the discontinuity between 23:59 on day N and 0:01 on day N-1
+    if (transitTime < bestTime) {
+      bestTime = transitTime;
+      bestDoy = doy;
     }
   }
 
+  console.log(`findAlnilamCulmination(${y}): doy=${bestDoy}, time=${bestTime.toFixed(4)}`);
   return { doy: bestDoy, time: bestTime };
 }
 
@@ -2354,6 +2370,45 @@ try {
   console.error(err);
   statusEl.textContent = `Sky load error: ${err.message}`;
 }
+
+// -----------------------------
+// Mobile detection and handling
+// -----------------------------
+function isMobileDevice() {
+  return window.innerWidth <= 768;
+}
+
+function initMobileMode() {
+  if (!isMobileDevice()) return;
+
+  // Add mobile mode class (hides panels + readouts)
+  document.body.classList.add('fullscreen-mode');
+  document.body.classList.add('mobile-mode');
+
+  // Wait for presets to load, then apply khufu preset
+  function applyMobilePreset() {
+    if (PRESETS.khufu2600) {
+      applyPreset(PRESETS.khufu2600);
+    } else {
+      // Presets not loaded yet, retry
+      setTimeout(applyMobilePreset, 100);
+    }
+  }
+  applyMobilePreset();
+
+  // Show dialog after 1 second
+  setTimeout(() => {
+    document.getElementById('mobileDialog').style.display = 'flex';
+  }, 1000);
+}
+
+// Dialog close button
+document.getElementById('mobileDialogClose').addEventListener('click', () => {
+  document.getElementById('mobileDialog').style.display = 'none';
+});
+
+// Initialize mobile mode on load
+initMobileMode();
 
 // -----------------------------
 // Render loop
