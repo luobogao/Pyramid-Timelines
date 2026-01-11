@@ -38,7 +38,7 @@ canvas { display:block; }
 .collapse-btn {
   display: none;
   position: fixed;
-  top: 12px;
+  bottom: 12px;
   left: 12px;
   z-index: 1000;
   padding: 10px 20px;
@@ -57,15 +57,119 @@ canvas { display:block; }
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-/* Fullscreen mode - hide UI elements */
+/* Fullscreen mode - hide UI elements but keep date and angle readouts */
 body.fullscreen-mode #hud,
-body.fullscreen-mode #timelineBar,
-body.fullscreen-mode #angleReadout,
-body.fullscreen-mode #yearReadout {
+body.fullscreen-mode #rightPanel,
+body.fullscreen-mode #timelineBar {
   display: none !important;
 }
 body.fullscreen-mode .collapse-btn {
   display: block;
+}
+
+/* Right Panel */
+#rightPanel {
+  position: fixed;
+  right: 12px;
+  top: 120px;
+  bottom: 165px;
+  width: 360px;
+  z-index: 10;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(0,0,0,.12);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#rightPanel .panel-header {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: #888;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  flex-shrink: 0;
+}
+
+#rightPanel .preset-buttons {
+  display: flex;
+  gap: 6px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  flex-shrink: 0;
+}
+
+.story-preset-btn {
+  flex: 1;
+  padding: 10px 8px;
+  background: #0066aa;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.story-preset-btn:hover {
+  background: #0088dd;
+}
+
+.story-preset-btn.active {
+  background: #d00000;
+  box-shadow: 0 2px 8px rgba(208,0,0,0.3);
+}
+
+#storyContent {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #333;
+}
+
+#storyContent h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111;
+  margin: 0 0 12px 0;
+  line-height: 1.3;
+}
+
+#storyContent p {
+  margin: 0 0 14px 0;
+}
+
+#storyContent ul {
+  margin: 0 0 14px 0;
+  padding-left: 20px;
+}
+
+#storyContent li {
+  margin-bottom: 6px;
+}
+
+/* Custom scrollbar for story content */
+#storyContent::-webkit-scrollbar {
+  width: 6px;
+}
+#storyContent::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.05);
+  border-radius: 3px;
+}
+#storyContent::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.2);
+  border-radius: 3px;
+}
+#storyContent::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.3);
 }
 
 /* HUD Sections */
@@ -315,10 +419,10 @@ body.fullscreen-mode .collapse-btn {
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 110px;
+  height: 150px;
   background: rgba(255,255,255,0.95);
   border-top: 1px solid rgba(0,0,0,0.15);
-  padding: 6px 24px 8px;
+  padding: 12px 24px 14px;
   z-index: 100;
   backdrop-filter: blur(6px);
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
@@ -327,13 +431,45 @@ body.fullscreen-mode .collapse-btn {
   flex-direction: column;
 }
 
+/* Timeline controls */
+#timelineControls {
+  position: absolute;
+  top: 12px;
+  right: 24px;
+  z-index: 10;
+}
+
+.timeline-mode-btn {
+  padding: 4px 12px;
+  background: #666;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.timeline-mode-btn:hover {
+  background: #555;
+}
+
+.timeline-mode-btn[data-mode="expanded"] {
+  background: #0066aa;
+}
+
+.timeline-mode-btn[data-mode="expanded"]:hover {
+  background: #0077bb;
+}
+
 /* Preset markers on timeline */
 #presetMarkers {
   position: relative;
   width: 100%;
-  height: 26px;
+  height: 30px;
   flex-shrink: 0;
-  margin-bottom: 2px;
+  margin-bottom: 8px;
 }
 
 .preset-marker {
@@ -367,6 +503,15 @@ body.fullscreen-mode .collapse-btn {
   background: #0088dd;
 }
 
+.preset-marker-btn.active {
+  background: #d00000;
+  box-shadow: 0 2px 6px rgba(208,0,0,0.4);
+}
+
+.preset-marker-btn.active + .preset-marker-line {
+  background: #d00000;
+}
+
 .preset-marker-line {
   width: 2px;
   height: 6px;
@@ -376,9 +521,9 @@ body.fullscreen-mode .collapse-btn {
 #tickScale {
   position: relative;
   width: 100%;
-  height: 16px;
+  height: 22px;
   flex-shrink: 0;
-  margin-bottom: 0;
+  margin-bottom: 6px;
 }
 
 #tickScale .tick {
@@ -399,18 +544,18 @@ body.fullscreen-mode .collapse-btn {
 #tickScale .tick-line.minor { height: 4px; background: rgba(0,0,0,0.25); }
 
 #tickScale .tick-label {
-  font-size: 8px;
+  font-size: 9px;
   color: #555;
-  margin-top: 0;
+  margin-top: 2px;
   white-space: nowrap;
 }
 
 #dynastyTrack {
   position: relative;
   width: 100%;
-  height: 24px;
+  height: 28px;
   flex-shrink: 0;
-  margin-bottom: 4px;
+  margin-bottom: 10px;
   border-radius: 4px;
   overflow: hidden;
   background: rgba(0,0,0,0.08);
@@ -419,7 +564,7 @@ body.fullscreen-mode .collapse-btn {
 #dynastyTrack .dynasty {
   position: absolute;
   height: 100%;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
   color: #fff;
   text-shadow: 0 1px 2px rgba(0,0,0,0.7);

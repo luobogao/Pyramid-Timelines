@@ -24,6 +24,7 @@ let currentOriginKey = "khufu";
 let REF_LAT_DEG = ORIGIN_SITES[currentOriginKey].lat;
 let REF_LON_DEG = ORIGIN_SITES[currentOriginKey].lon;
 let showFullGlobe = true;  // When true, show all stars; when false, hide near-side stars
+let showQueensShaft = true;  // When true, show Queen's Chamber shaft line
 let currentNearestZodiac = null;  // Nearest zodiac constellation to Sphinx sight line
 
 // Zodiac constellation names for display
@@ -391,12 +392,16 @@ const angleEl = document.getElementById('angleReadout');
 // Sky sphere radius - all directional lines extend to this distance
 const SKY_RADIUS = 3500;
 
-// Red beam from King's Chamber toward Alnilam direction on the sky sphere.
-// Implemented as a thin cylinder so it remains visible at a wide range of zoom levels.
-const BEAM_RADIUS = 3.0; // meters (visual thickness)
-const beamGeom = new THREE.CylinderGeometry(1, 1, 1, 18, 1, true);
-const beamMat  = new THREE.MeshBasicMaterial({ color: 0xff0000, depthTest: false, depthWrite: false });
-const alnilamBeam = new THREE.Mesh(beamGeom, beamMat);
+// Red dashed line from King's Chamber toward Alnilam direction on the sky sphere.
+const alnilamBeamGeom = new THREE.BufferGeometry();
+const alnilamBeamMat = new THREE.LineDashedMaterial({
+  color: 0xff0000,
+  dashSize: 30,
+  gapSize: 15,
+  depthTest: false,
+  depthWrite: false
+});
+const alnilamBeam = new THREE.Line(alnilamBeamGeom, alnilamBeamMat);
 alnilamBeam.frustumCulled = false;
 alnilamBeam.renderOrder = 9999;
 sceneMain.add(alnilamBeam);
@@ -414,20 +419,62 @@ const shaftDir = new THREE.Vector3(
   Math.sin(SHAFT_ALT_RAD)                            // z (Up)
 ).normalize();
 
-const SHAFT_RADIUS = 2.6; // meters (visual thickness)
-const shaftGeom = new THREE.CylinderGeometry(1, 1, 1, 18, 1, true);
-const shaftMat  = new THREE.MeshBasicMaterial({ color: 0x000000, depthTest: false, depthWrite: false });
-const shaftLine = new THREE.Mesh(shaftGeom, shaftMat);
+// Black dashed line for shaft direction
+const shaftOrigin = new THREE.Vector3(0, 0, KINGS_CHAMBER_Z);
+const shaftEndpoint = shaftDir.clone().multiplyScalar(SKY_RADIUS).add(shaftOrigin);
+const shaftLineGeom = new THREE.BufferGeometry().setFromPoints([shaftOrigin, shaftEndpoint]);
+const shaftLineMat = new THREE.LineDashedMaterial({
+  color: 0x000000,
+  dashSize: 30,
+  gapSize: 15,
+  depthTest: false,
+  depthWrite: false
+});
+const shaftLine = new THREE.Line(shaftLineGeom, shaftLineMat);
+shaftLine.computeLineDistances();  // Required for dashed lines
 shaftLine.frustumCulled = false;
 shaftLine.renderOrder = 9998;
 sceneMain.add(shaftLine);
 
-// Set once: constant orientation and position (from King's Chamber outward)
-const SHAFT_LENGTH = SKY_RADIUS; // extend to sky sphere
-shaftLine.scale.set(SHAFT_RADIUS, SHAFT_LENGTH, SHAFT_RADIUS);
-shaftLine.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), shaftDir);
-const shaftOrigin = new THREE.Vector3(0, 0, KINGS_CHAMBER_Z);
-shaftLine.position.copy(shaftDir.clone().multiplyScalar(SHAFT_LENGTH / 2).add(shaftOrigin));
+// -----------------------------
+// Endpoint rings on the sky sphere (unfilled circles like Sphinx style)
+// -----------------------------
+const ENDPOINT_RING_RADIUS = 40; // outer radius
+const ENDPOINT_RING_WIDTH = 6;   // ring thickness
+
+// Red ring for Alnilam beam endpoint
+const alnilamRingGeom = new THREE.RingGeometry(ENDPOINT_RING_RADIUS - ENDPOINT_RING_WIDTH, ENDPOINT_RING_RADIUS, 48);
+const alnilamDiskMat = new THREE.MeshBasicMaterial({
+  color: 0xff0000,
+  side: THREE.DoubleSide,
+  transparent: true,
+  opacity: 0.8,
+  depthTest: false,
+  depthWrite: false
+});
+const alnilamDisk = new THREE.Mesh(alnilamRingGeom, alnilamDiskMat);
+alnilamDisk.frustumCulled = false;
+alnilamDisk.renderOrder = 10000;
+sceneMain.add(alnilamDisk);
+
+// Black ring for shaft line endpoint
+const shaftRingGeom = new THREE.RingGeometry(ENDPOINT_RING_RADIUS - ENDPOINT_RING_WIDTH, ENDPOINT_RING_RADIUS, 48);
+const shaftDiskMat = new THREE.MeshBasicMaterial({
+  color: 0x000000,
+  side: THREE.DoubleSide,
+  transparent: true,
+  opacity: 0.8,
+  depthTest: false,
+  depthWrite: false
+});
+const shaftDisk = new THREE.Mesh(shaftRingGeom, shaftDiskMat);
+shaftDisk.frustumCulled = false;
+shaftDisk.renderOrder = 9999;
+sceneMain.add(shaftDisk);
+
+// Position shaft ring (static - shaft direction doesn't change)
+shaftDisk.position.copy(shaftEndpoint);
+shaftDisk.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), shaftDir);
 
 // -----------------------------
 // Queen's Chamber SOUTH shaft
@@ -441,18 +488,22 @@ const queensShaftDir = new THREE.Vector3(
   Math.sin(QUEENS_SHAFT_ALT_RAD)
 ).normalize();
 
-const queensShaftGeom = new THREE.CylinderGeometry(1, 1, 1, 18, 1, true);
-const queensShaftMat  = new THREE.MeshBasicMaterial({ color: 0x000000, depthTest: false, depthWrite: false });
-const queensShaftLine = new THREE.Mesh(queensShaftGeom, queensShaftMat);
+// Dashed line for Queen's shaft
+const queensShaftOrigin = new THREE.Vector3(0, 0, QUEENS_CHAMBER_Z);
+const queensShaftEndpoint = queensShaftDir.clone().multiplyScalar(SKY_RADIUS).add(queensShaftOrigin);
+const queensShaftGeom = new THREE.BufferGeometry().setFromPoints([queensShaftOrigin, queensShaftEndpoint]);
+const queensShaftMat = new THREE.LineDashedMaterial({
+  color: 0x666666,
+  dashSize: 30,
+  gapSize: 15,
+  depthTest: false,
+  depthWrite: false
+});
+const queensShaftLine = new THREE.Line(queensShaftGeom, queensShaftMat);
+queensShaftLine.computeLineDistances();
 queensShaftLine.frustumCulled = false;
 queensShaftLine.renderOrder = 9997;
 sceneMain.add(queensShaftLine);
-
-// Set once: constant orientation and position (from Queen's Chamber outward)
-queensShaftLine.scale.set(SHAFT_RADIUS, SHAFT_LENGTH, SHAFT_RADIUS);
-queensShaftLine.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), queensShaftDir);
-const queensShaftOrigin = new THREE.Vector3(0, 0, QUEENS_CHAMBER_Z);
-queensShaftLine.position.copy(queensShaftDir.clone().multiplyScalar(SHAFT_LENGTH / 2).add(queensShaftOrigin));
 
 // -----------------------------
 // Sphinx sight line - pointing due East, angled 15° upward
@@ -666,7 +717,7 @@ errorAngleEl.style.cssText = `
 `;
 document.body.appendChild(errorAngleEl);
 
-function updateErrorArc(alnilamDir) {
+function updateErrorArc(alnilamDir, totalAngleDiff) {
   // Only show error arc when Khufu is selected (shaft alignment)
   if (currentOriginKey !== 'khufu') {
     errorArc.visible = false;
@@ -683,6 +734,13 @@ function updateErrorArc(alnilamDir) {
   if (angleDeg >= 90) {
     errorArc.visible = false;
     errorAngleEl.textContent = '';
+    return;
+  }
+
+  // Show "< 1°" when very close, hide arc but keep text
+  if (totalAngleDiff < 1.0) {
+    errorArc.visible = false;
+    errorAngleEl.textContent = `Δ < 1°`;
     return;
   }
 
@@ -711,9 +769,10 @@ function updateErrorArc(alnilamDir) {
       p = new THREE.Vector3().copy(shaftDir);
     }
 
+    // Add King's Chamber offset so arc connects to end of lines
     posAttr.array[i * 3 + 0] = p.x * ERROR_ARC_RADIUS;
     posAttr.array[i * 3 + 1] = p.y * ERROR_ARC_RADIUS;
-    posAttr.array[i * 3 + 2] = p.z * ERROR_ARC_RADIUS;
+    posAttr.array[i * 3 + 2] = p.z * ERROR_ARC_RADIUS + KINGS_CHAMBER_Z;
   }
 
   posAttr.needsUpdate = true;
@@ -1222,16 +1281,33 @@ function updateSkyForJD(jd, epj) {
     const vA = equatorialJ2000ToHorizontalUnit(ALNILAM_RA_RAD, ALNILAM_DEC_RAD, jd, latRad, lonRad, rp);
     const dir = new THREE.Vector3(vA.x, vA.y, vA.z).normalize();
 
-    const length = SKY_RADIUS;  // extend to sky sphere
-    alnilamBeam.scale.set(BEAM_RADIUS, length, BEAM_RADIUS);
-    alnilamBeam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    // Update dashed line geometry from King's Chamber to sky sphere
     const beamOrigin = new THREE.Vector3(0, 0, KINGS_CHAMBER_Z);
-    alnilamBeam.position.copy(dir.clone().multiplyScalar(length / 2).add(beamOrigin));
+    const beamEnd = dir.clone().multiplyScalar(SKY_RADIUS).add(beamOrigin);
+    alnilamBeam.geometry.setFromPoints([beamOrigin, beamEnd]);
+    alnilamBeam.computeLineDistances();  // Required for dashed lines
+
+    // Update Alnilam ring position at endpoint
+    alnilamDisk.position.copy(beamEnd);
+    alnilamDisk.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
 
     // Azimuth from North towards East; Altitude above horizon
     let az = Math.atan2(dir.x, dir.y);
     if (az < 0) az += Math.PI * 2;
     const alt = Math.asin(Math.max(-1, Math.min(1, dir.z)));
+
+    // Calculate angle difference between Alnilam and shaft
+    const altDiffDeg = Math.abs(rad2deg(alt) - rad2deg(SHAFT_ALT_RAD));
+    const azDiffRad = Math.abs(az - SHAFT_AZ_RAD);
+    const azDiffDeg = rad2deg(Math.min(azDiffRad, Math.PI * 2 - azDiffRad));
+    const totalAngleDiff = Math.sqrt(altDiffDeg * altDiffDeg + azDiffDeg * azDiffDeg);
+
+    // Hide shaft line and its disk if angle difference is less than 1 degree (show only red beam)
+    if (currentOriginKey === 'khufu') {
+      const showShaft = totalAngleDiff >= 1.0;
+      shaftLine.visible = showShaft;
+      shaftDisk.visible = showShaft;
+    }
 
     // Update angle readout based on origin
     if (currentOriginKey === 'sphinx' && currentNearestZodiac) {
@@ -1244,7 +1320,7 @@ function updateSkyForJD(jd, epj) {
     }
 
     // Update error arc between Alnilam and shaft
-    updateErrorArc(dir);
+    updateErrorArc(dir, totalAngleDiff);
   }
 }
 
@@ -1261,19 +1337,30 @@ const doyLabel   = document.getElementById('doyLabel');
 const timeSlider = document.getElementById('timeSlider');
 const timeLabel  = document.getElementById('timeLabel');
 
-// Exponential year mapping: more resolution near present, less in distant past
-const YEAR_MIN = -100000;
+// Year range constants
 const YEAR_MAX = 2026;
+
+// Timeline mode: 'standard' (predynastic to present) or 'expanded' (100k years)
+let timelineMode = 'standard';
 
 // Piecewise linear scale breakpoints for better distribution
 // Format: { slider: 0-1000, year: corresponding year }
-const SCALE_BREAKPOINTS = [
+const SCALE_BREAKPOINTS_STANDARD = [
+  { slider: 0,    year: -5500 },    // Start at early predynastic
+  { slider: 1000, year: 2026 },     // Present (linear scale)
+];
+
+const SCALE_BREAKPOINTS_EXPANDED = [
   { slider: 0,    year: -100000 },
   { slider: 150,  year: -50000 },   // 15% of slider for -100k to -50k
   { slider: 400,  year: -10000 },   // 25% of slider for -50k to -10k
   { slider: 600,  year: -5000 },    // 20% of slider for -10k to -5k (predynastic)
   { slider: 1000, year: 2026 },     // 40% of slider for -5k to present (dynasties)
 ];
+
+// Active breakpoints (changes based on mode)
+let SCALE_BREAKPOINTS = SCALE_BREAKPOINTS_STANDARD;
+let YEAR_MIN = -5500;
 
 // Convert slider (0-1000) to year using piecewise linear mapping
 function sliderToYear(sliderVal) {
@@ -1317,10 +1404,12 @@ function applyOrigin() {
   REF_LON_DEG = ORIGIN_SITES[currentOriginKey].lon;
   updateCoordDisplay();
 
-  // Show/hide directional lines based on selected origin
+  // Show/hide directional lines and endpoint disks based on selected origin
   shaftLine.visible = (currentOriginKey === 'khufu');
-  queensShaftLine.visible = (currentOriginKey === 'khufu');
+  shaftDisk.visible = (currentOriginKey === 'khufu');
+  queensShaftLine.visible = showQueensShaft && (currentOriginKey === 'khufu');
   alnilamBeam.visible = (currentOriginKey === 'khufu');
+  alnilamDisk.visible = (currentOriginKey === 'khufu');
   errorArc.visible = (currentOriginKey === 'khufu');
   sphinxSightLine.visible = (currentOriginKey === 'sphinx');
   sphinxRing.visible = (currentOriginKey === 'sphinx');
@@ -1336,6 +1425,11 @@ fetch('settings.json')
       showFullGlobe = data.showFullGlobe;
       console.log('Settings loaded: showFullGlobe =', showFullGlobe);
       scheduleSkyUpdate();
+    }
+    if (typeof data.showQueensShaft === 'boolean') {
+      showQueensShaft = data.showQueensShaft;
+      queensShaftLine.visible = showQueensShaft && (currentOriginKey === 'khufu');
+      console.log('Settings loaded: showQueensShaft =', showQueensShaft);
     }
   })
   .catch(err => console.error('Failed to load settings:', err));
@@ -1355,6 +1449,7 @@ originRadios.forEach(r => {
     console.log('=== ORIGIN CHANGED ===');
     console.log(`currentOriginKey = "${currentOriginKey}";`);
 
+    clearPresetHighlights();
     applyOrigin();
     applySnapMode();
   });
@@ -1614,55 +1709,66 @@ function renderTickScale() {
 
   scale.innerHTML = '';
 
-  // Generate tick marks at various intervals
-  // Major: every 10,000 years
-  // Medium: every 5,000 years (not already a major)
-  // Minor: every 1,000 years (not already major or medium)
-
   const ticks = [];
 
-  // Collect all tick positions
-  for (let year = YEAR_MIN; year <= YEAR_MAX; year += 1000) {
-    let tickType = 'minor';
-    if (year % 10000 === 0) tickType = 'major';
-    else if (year % 5000 === 0) tickType = 'medium';
+  if (timelineMode === 'standard') {
+    // Standard mode: linear scale with 500-year intervals
+    // Major: every 2000 years, Medium: every 1000 years, Minor: every 500 years
+    for (let year = -5500; year <= YEAR_MAX; year += 500) {
+      let tickType = 'minor';
+      if (year % 2000 === 0) tickType = 'major';
+      else if (year % 1000 === 0) tickType = 'medium';
 
-    const sliderPos = yearToSlider(year) / 10;  // 0-100%
+      const sliderPos = yearToSlider(year) / 10;  // 0-100%
+      if (sliderPos < 0 || sliderPos > 100) continue;
 
-    // Skip if out of range
-    if (sliderPos < 0 || sliderPos > 100) continue;
+      ticks.push({ year, sliderPos, tickType });
+    }
+  } else {
+    // Expanded mode: piecewise scale with larger intervals
+    // Major: every 10,000 years, Medium: every 5,000 years, Minor: every 1,000 years
+    for (let year = YEAR_MIN; year <= YEAR_MAX; year += 1000) {
+      let tickType = 'minor';
+      if (year % 10000 === 0) tickType = 'major';
+      else if (year % 5000 === 0) tickType = 'medium';
 
-    ticks.push({ year, sliderPos, tickType });
-  }
+      const sliderPos = yearToSlider(year) / 10;  // 0-100%
+      if (sliderPos < 0 || sliderPos > 100) continue;
 
-  // Add year 0 and current year if not already included
-  if (!ticks.find(t => t.year === 0)) {
-    ticks.push({ year: 0, sliderPos: yearToSlider(0) / 10, tickType: 'major' });
-  }
-  if (!ticks.find(t => t.year === 2000)) {
-    ticks.push({ year: 2000, sliderPos: yearToSlider(2000) / 10, tickType: 'major' });
-  }
-
-  // Filter ticks that are too close together
-  // For minor ticks, only show if they're at least 2% apart from neighbors
-  const filteredTicks = [];
-  ticks.sort((a, b) => a.sliderPos - b.sliderPos);
-
-  for (let i = 0; i < ticks.length; i++) {
-    const tick = ticks[i];
-
-    // Always include major and medium ticks
-    if (tick.tickType === 'major' || tick.tickType === 'medium') {
-      filteredTicks.push(tick);
-      continue;
+      ticks.push({ year, sliderPos, tickType });
     }
 
-    // For minor ticks, check spacing
-    const prevPos = i > 0 ? ticks[i - 1].sliderPos : -Infinity;
-    const nextPos = i < ticks.length - 1 ? ticks[i + 1].sliderPos : Infinity;
+    // Add year 0 and 2000 if not already included
+    if (!ticks.find(t => t.year === 0)) {
+      ticks.push({ year: 0, sliderPos: yearToSlider(0) / 10, tickType: 'major' });
+    }
+    if (!ticks.find(t => t.year === 2000)) {
+      ticks.push({ year: 2000, sliderPos: yearToSlider(2000) / 10, tickType: 'major' });
+    }
+  }
 
-    if (tick.sliderPos - prevPos > 1.5 && nextPos - tick.sliderPos > 1.5) {
-      filteredTicks.push(tick);
+  // Filter ticks that are too close together (only for expanded mode)
+  let filteredTicks = ticks;
+  if (timelineMode === 'expanded') {
+    filteredTicks = [];
+    ticks.sort((a, b) => a.sliderPos - b.sliderPos);
+
+    for (let i = 0; i < ticks.length; i++) {
+      const tick = ticks[i];
+
+      // Always include major and medium ticks
+      if (tick.tickType === 'major' || tick.tickType === 'medium') {
+        filteredTicks.push(tick);
+        continue;
+      }
+
+      // For minor ticks, check spacing
+      const prevPos = i > 0 ? ticks[i - 1].sliderPos : -Infinity;
+      const nextPos = i < ticks.length - 1 ? ticks[i + 1].sliderPos : Infinity;
+
+      if (tick.sliderPos - prevPos > 1.5 && nextPos - tick.sliderPos > 1.5) {
+        filteredTicks.push(tick);
+      }
     }
   }
 
@@ -1788,6 +1894,7 @@ document.querySelectorAll('input[name="snapMode"]').forEach(radio => {
   radio.addEventListener('change', () => {
     console.log('=== SNAP MODE CHANGED ===');
     console.log(`snapMode = "${radio.value}";`);
+    clearPresetHighlights();
     applySnapMode();
   });
 });
@@ -1797,6 +1904,7 @@ yearSlider.addEventListener('input', () => {
   const y = sliderToYear(Number(yearSlider.value));
   yearInput.value = String(y);
 
+  clearPresetHighlights();
   applySnapMode();
 });
 
@@ -1811,6 +1919,7 @@ yearSlider.addEventListener('change', () => {
 
 yearInput.addEventListener('change', () => {
   syncYearFromInput();
+  clearPresetHighlights();
   scheduleSkyUpdate();
 
   const y = Number(yearInput.value);
@@ -1843,11 +1952,13 @@ window.logState = function() {
 };
 
 doySlider.addEventListener('input', () => {
+  clearPresetHighlights();
   updateTimeLabels();
   scheduleSkyUpdate();
 });
 
 timeSlider.addEventListener('input', () => {
+  clearPresetHighlights();
   updateTimeLabels();
   scheduleSkyUpdate();
 });
@@ -1964,6 +2075,133 @@ document.getElementById('btnCollapse').addEventListener('click', () => {
 });
 
 // -----------------------------
+// Story Panel
+// -----------------------------
+let storyData = {};
+let currentStoryKey = 'INTRO';
+
+function parseStoryFile(text) {
+  const sections = {};
+  const parts = text.split(/^===(\w+)===$\n/gm);
+
+  // parts array: ['', 'INTRO', 'intro content...', 'sphinx47k', 'sphinx content...', ...]
+  for (let i = 1; i < parts.length; i += 2) {
+    const key = parts[i];
+    const content = parts[i + 1] || '';
+    sections[key] = content.trim();
+  }
+  return sections;
+}
+
+function formatStoryContent(text) {
+  // Split into paragraphs and format
+  const lines = text.split('\n');
+  let html = '';
+  let inList = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      if (inList) {
+        html += '</ul>';
+        inList = false;
+      }
+      continue;
+    }
+
+    // Check for bullet points
+    if (trimmed.startsWith('•') || trimmed.startsWith('-')) {
+      if (!inList) {
+        html += '<ul>';
+        inList = true;
+      }
+      html += `<li>${trimmed.slice(1).trim()}</li>`;
+    } else if (lines.indexOf(line) === 0 || (lines.indexOf(line) === 1 && !lines[0].trim())) {
+      // First non-empty line is the title
+      if (inList) {
+        html += '</ul>';
+        inList = false;
+      }
+      html += `<h2>${trimmed}</h2>`;
+    } else {
+      if (inList) {
+        html += '</ul>';
+        inList = false;
+      }
+      html += `<p>${trimmed}</p>`;
+    }
+  }
+
+  if (inList) html += '</ul>';
+  return html;
+}
+
+function clearPresetHighlights() {
+  // Remove active state from all preset buttons
+  document.querySelectorAll('.story-preset-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  document.querySelectorAll('.preset-marker-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+}
+
+function showStory(key) {
+  const content = storyData[key] || storyData['default'] || 'No content available.';
+  const storyEl = document.getElementById('storyContent');
+  storyEl.innerHTML = formatStoryContent(content);
+  currentStoryKey = key;
+
+  // Update active button state on right panel
+  document.querySelectorAll('.story-preset-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.preset === key);
+  });
+
+  // Update active button state on timeline markers
+  document.querySelectorAll('.preset-marker-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.presetKey === key);
+  });
+}
+
+// Load story content
+let storyLoaded = false;
+let presetsLoaded = false;
+
+function applyDefaultPreset() {
+  // Only run once both story and presets are loaded
+  if (!storyLoaded || !presetsLoaded) return;
+  if (PRESETS.khufu2600) {
+    applyPreset(PRESETS.khufu2600);
+    showStory('khufu2600');
+  }
+}
+
+fetch('story.txt')
+  .then(response => response.text())
+  .then(text => {
+    storyData = parseStoryFile(text);
+    console.log('Story sections loaded:', Object.keys(storyData));
+    storyLoaded = true;
+    applyDefaultPreset();
+  })
+  .catch(err => {
+    console.error('Failed to load story:', err);
+    document.getElementById('storyContent').innerHTML = '<p>Failed to load content.</p>';
+  });
+
+// Story preset buttons
+document.querySelectorAll('.story-preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const presetKey = btn.dataset.preset;
+    showStory(presetKey);
+    // Also apply the preset if it exists
+    if (PRESETS[presetKey]) {
+      applyPreset(PRESETS[presetKey]);
+    }
+  });
+});
+
+// -----------------------------
 // Presets
 // -----------------------------
 // Presets loaded from external JSON file
@@ -1981,6 +2219,9 @@ function renderPresetMarkers() {
   container.innerHTML = '';
 
   for (const [key, preset] of Object.entries(PRESETS)) {
+    // Skip presets outside current timeline range
+    if (preset.year < YEAR_MIN || preset.year > YEAR_MAX) continue;
+
     const sliderPos = yearToSlider(preset.year) / 10; // 0-100%
 
     const marker = document.createElement('div');
@@ -1990,7 +2231,11 @@ function renderPresetMarkers() {
     const btn = document.createElement('button');
     btn.className = 'preset-marker-btn';
     btn.textContent = PRESET_LABELS[key] || key;
-    btn.addEventListener('click', () => applyPreset(preset));
+    btn.dataset.presetKey = key;
+    btn.addEventListener('click', () => {
+      applyPreset(preset);
+      showStory(key);
+    });
 
     const line = document.createElement('div');
     line.className = 'preset-marker-line';
@@ -2007,6 +2252,8 @@ fetch('presets.json')
     PRESETS = data;
     console.log('Presets loaded:', Object.keys(PRESETS));
     renderPresetMarkers();
+    presetsLoaded = true;
+    applyDefaultPreset();
   })
   .catch(err => console.error('Failed to load presets:', err));
 
@@ -2015,6 +2262,20 @@ function applyPreset(preset) {
     console.warn('Preset not yet loaded');
     return;
   }
+
+  // Auto-switch timeline mode based on preset year
+  if (preset.year < -5500) {
+    // Sphinx presets (deep time) -> expanded mode
+    if (timelineMode !== 'expanded') {
+      setTimelineMode('expanded');
+    }
+  } else {
+    // Khufu preset (dynastic era) -> standard mode
+    if (timelineMode !== 'standard') {
+      setTimelineMode('standard');
+    }
+  }
+
   // Set origin
   currentOriginKey = preset.origin;
   document.querySelector(`input[name="origin"][value="${preset.origin}"]`).checked = true;
@@ -2039,6 +2300,45 @@ function applyPreset(preset) {
 }
 
 // Preset buttons are now rendered on the timeline bar via renderPresetMarkers()
+
+// -----------------------------
+// Timeline Mode Toggle (Standard / Expanded)
+// -----------------------------
+function setTimelineMode(mode) {
+  const currentYear = sliderToYear(yearSlider.value);
+
+  timelineMode = mode;
+  if (mode === 'expanded') {
+    SCALE_BREAKPOINTS = SCALE_BREAKPOINTS_EXPANDED;
+    YEAR_MIN = -100000;
+  } else {
+    SCALE_BREAKPOINTS = SCALE_BREAKPOINTS_STANDARD;
+    YEAR_MIN = -5500;
+  }
+
+  // Update button appearance
+  const btn = document.getElementById('btnTimelineMode');
+  btn.dataset.mode = mode;
+  btn.textContent = mode === 'expanded' ? 'Expanded' : 'Standard';
+
+  // Clamp current year to new range and update slider
+  const clampedYear = Math.max(YEAR_MIN, Math.min(YEAR_MAX, currentYear));
+  yearSlider.value = yearToSlider(clampedYear);
+
+  // Refresh timeline visualizations
+  renderTickScale();
+  renderDynastyTrack();
+  renderPresetMarkers();
+
+  // Trigger sky update
+  pendingSkyUpdate = true;
+}
+
+// Timeline mode button click handler
+document.getElementById('btnTimelineMode').addEventListener('click', () => {
+  const newMode = timelineMode === 'standard' ? 'expanded' : 'standard';
+  setTimelineMode(newMode);
+});
 
 // -----------------------------
 // Start

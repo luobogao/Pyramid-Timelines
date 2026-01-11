@@ -1,0 +1,54 @@
+===INTRO===
+Welcome to the Giza Plateau Time Explorer
+
+This interactive visualization allows you to explore the astronomical alignments of the Great Pyramid of Khufu and the Great Sphinx across 100,000 years of history.
+
+Use the timeline at the bottom to travel through time, or select one of the preset alignments to see key moments in deep history.
+
+The precession of Earth's axis causes the positions of stars to shift slowly over millennia. This tool calculates these positions using the Vondrák 2011 long-term precession model, allowing us to see exactly where stars appeared in the sky at any point in the past.
+
+===sphinx47k===
+The Sphinx Alignment: 47,000 BC
+
+At the summer solstice dawn around 47,234 BC, an observer standing at the Great Sphinx would have witnessed a remarkable sight: the constellation Leo rising directly in the east, perfectly aligned with the Sphinx's eternal gaze.
+
+The Sphinx, with its lion's body and human head, faces due east—toward the rising sun on the equinoxes. But due to the precession of Earth's axis, different zodiac constellations rise at dawn during different epochs.
+
+The precession cycle takes approximately 26,000 years to complete. This means that roughly every 2,160 years, a different zodiac constellation dominates the eastern horizon at the spring equinox dawn.
+
+At 47,000 BC, we find ourselves at an earlier "Age of Leo"—when the celestial lion rose to greet its earthly counterpart carved in stone. Could the Sphinx be far older than conventional archaeology suggests? This alignment offers a tantalizing possibility.
+
+===sphinx25k===
+The Sphinx Alignment: 25,500 BC
+
+Around 25,543 BC, at the summer solstice dawn, the constellation Leo once again rose in alignment with the Sphinx's eastward gaze.
+
+This date falls within the last "Age of Leo" in the precession cycle—approximately 10,500 to 8,000 BC by traditional zodiacal age reckoning, though the exact alignment shown here is from an earlier peak position.
+
+Some researchers, including Robert Bauval and Graham Hancock, have proposed that the Sphinx may date to this era based on:
+
+• The leonine form matching the constellation Leo
+• Evidence of water erosion on the Sphinx enclosure
+• The overall layout of the Giza plateau mirroring Orion's Belt
+
+While mainstream Egyptology dates the Sphinx to around 2500 BC during the reign of Khafre, these astronomical alignments invite us to consider alternative timelines.
+
+===khufu2600===
+Khufu's Star Shaft Alignment: ~2500 BC
+
+The Great Pyramid of Khufu contains mysterious narrow shafts extending from the King's Chamber and Queen's Chamber. The southern shaft from the King's Chamber is angled at approximately 45 degrees.
+
+Around 2500 BC—the conventional date for the pyramid's construction—this shaft pointed toward a significant celestial target: the star Alnilam, the central star of Orion's Belt.
+
+In ancient Egyptian religion, Orion was associated with Osiris, the god of the afterlife. The shafts may have served as symbolic passages for the pharaoh's soul to ascend to the stars and join Osiris in the heavens.
+
+The red line in this visualization shows the direction toward Alnilam, while the black line shows the fixed angle of the physical shaft. When these align, we see a potential "target date" for the pyramid's design.
+
+The current view shows the shaft alignment at the time when Alnilam transits highest in the night sky, offering the best visibility of this celestial connection.
+
+===default===
+Select a Preset
+
+Choose one of the preset alignments above to learn about the astronomical significance of the Giza monuments across different time periods.
+
+Each preset will transport you to a specific moment in time and explain the celestial alignments visible from the perspective of the ancient builders—or perhaps even more ancient observers.

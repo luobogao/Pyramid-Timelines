@@ -89,7 +89,23 @@
   <!-- Floating collapse button (visible in fullscreen mode) -->
   <button id="btnCollapse" class="collapse-btn" type="button">Exit Fullscreen</button>
 
+  <!-- Right Panel - Story/Info -->
+  <div id="rightPanel">
+    <div class="panel-header">Explore</div>
+    <div class="preset-buttons">
+      <button class="story-preset-btn" data-preset="sphinx47k">Sphinx 47k BC</button>
+      <button class="story-preset-btn" data-preset="sphinx25k">Sphinx 25k BC</button>
+      <button class="story-preset-btn" data-preset="khufu2600">Khufu 2500 BC</button>
+    </div>
+    <div id="storyContent">
+      <p>Loading...</p>
+    </div>
+  </div>
+
   <div id="timelineBar">
+    <div id="timelineControls">
+      <button id="btnTimelineMode" class="timeline-mode-btn" data-mode="standard">Standard</button>
+    </div>
     <div id="presetMarkers"></div>
     <div id="tickScale"></div>
     <div id="dynastyTrack"></div>
