@@ -24,65 +24,29 @@
     <input id="yearInput" type="number" class="mono" />
   </div>
   <div id="hud">
-    <div><b>Giza Pyramids (Ideal Wireframe) + Sky Sphere</b></div>
-
-    <div class="row">
-      Mouse: <span class="mono">Left</span> rotate, <span class="mono">Wheel</span> zoom, <span class="mono">Right</span> pan.
-    </div>
-    <div class="row">
-      Keys: <span class="mono">G</span> grid, <span class="mono">A</span> axes, <span class="mono">S</span> sky, <span class="mono">C</span> constellations,
-      <span class="mono">R</span> reset view.
-    </div>
-
-    <div class="row mono">
-      Units: meters. Axes: X=East, Y=North, Z=Up. (Camera up-vector is +Z.)
-    </div>
-
     <div class="row small" id="originRow">
-      <span style="margin-right:6px;">Origin:</span>
       <label><input type="radio" name="origin" value="khufu" checked /> Khufu</label>
-      <label><input type="radio" name="origin" value="khafre" /> Khafre</label>
-      <label><input type="radio" name="origin" value="menkaure" /> Menkaure</label>
+      <label><input type="radio" name="origin" value="sphinx" /> Sphinx</label>
     </div>
 
-    <div class="row">
-      <div><b>Reference Lat/Lon (Great Pyramid center)</b></div>
-      <div class="mono">29°58′45″N, 31°08′03″E (≈ <span id="coordDec"></span>)</div>
-    </div>
-
-
-<div class="row">
-      <div><b>Sky time (UTC, deep time)</b></div>
-      <div class="row small" style="flex-wrap:wrap; gap:8px;">
-        <span>Snap mode:</span>
-        <label><input type="radio" name="snapMode" value="solstice" checked /> Solstice midnight</label>
-        <label><input type="radio" name="snapMode" value="culmination" /> Alnilam highest</label>
-        <span style="flex-basis:100%; height:0;"></span>
-        <span>Day:</span>
-        <input id="doySlider" type="range" min="1" max="366" step="1" />
-        <span class="mono" id="doyLabel"></span>
-        <span style="flex-basis:100%; height:0;"></span>
-        <span>Time:</span>
-        <input id="timeSlider" type="range" min="0" max="24" step="0.05" />
-        <span class="mono" id="timeLabel"></span>
-        <button id="btnMidnight" class="btn" type="button">Midnight</button>
-        <button id="btnDawn" class="btn" type="button">Dawn</button>
-      </div>
-      <div class="small">
-        Years use astronomical numbering (year 0 = 1 BCE).
-      </div>
-    </div>
-<div class="row small">
-      <label><input id="toggleSky" type="checkbox" checked /> Sky sphere</label>
-      <label><input id="toggleConst" type="checkbox" checked /> Constellation lines</label>
-      <label><input id="toggleStars" type="checkbox" checked /> Stars</label>
+    <div class="row small">
+      <label><input type="radio" name="snapMode" value="solstice" checked /> Solstice midnight</label>
+      <label><input type="radio" name="snapMode" value="dawn" /> Solstice dawn</label>
+      <label><input type="radio" name="snapMode" value="culmination" /> Alnilam highest</label>
     </div>
 
     <div class="row">
       <button id="btnFindAlignment" class="btn" type="button">FIND ALIGNMENT</button>
     </div>
 
-    <div class="row small" id="loadStatus">Loading sky datasets…</div>
+    <div class="row small" id="loadStatus"></div>
+
+    <!-- Hidden elements for JS compatibility -->
+    <input id="doySlider" type="range" min="1" max="366" step="1" style="display:none" />
+    <input id="timeSlider" type="range" min="0" max="24" step="0.05" style="display:none" />
+    <span id="coordDec" style="display:none"></span>
+    <span id="doyLabel" style="display:none"></span>
+    <span id="timeLabel" style="display:none"></span>
   </div>
 
   <div id="timelineBar">

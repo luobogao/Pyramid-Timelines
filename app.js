@@ -12,17 +12,11 @@ const ORIGIN_SITES = {
     lon: 31 + 8/60 + 3/3600,     // 31°08′03″E
     offset: new THREE.Vector3(0.000, 0.000, 0.000)
   },
-  khafre: {
-    label: "Khafre",
-    lat: 29 + 58/60 + 34/3600,   // 29°58′34″N
-    lon: 31 + 7/60 + 51/3600,    // 31°07′51″E
-    offset: new THREE.Vector3(-321.688, -338.715, 0.000)
-  },
-  menkaure: {
-    label: "Menkaure",
-    lat: 29 + 58/60 + 21/3600,   // 29°58′21″N
-    lon: 31 + 7/60 + 42/3600,    // 31°07′42″E
-    offset: new THREE.Vector3(-562.954, -739.014, 0.000)
+  sphinx: {
+    label: "Sphinx",
+    lat: 29 + 58/60 + 31/3600,   // 29°58′31″N (430m south of Khufu)
+    lon: 31 + 8/60 + 15/3600,    // 31°08′15″E (320m east of Khufu)
+    offset: new THREE.Vector3(320.0, -430.0, 0.0)
   }
 };
 
@@ -82,9 +76,6 @@ controls.update();
 // -----------------------------
 // Helpers
 // -----------------------------
-
-const axes = new THREE.AxesHelper(220);
-sceneMain.add(axes);
 
 sceneMain.add(new THREE.AmbientLight(0xffffff, 0.25));
 
@@ -148,15 +139,51 @@ function makeWire(vertices, material) {
   return new THREE.LineSegments(geom, material);
 }
 
-const mats = [
-  new THREE.LineBasicMaterial({ color: 0x000000 }),
-  new THREE.LineBasicMaterial({ color: 0x000000 }),
-  new THREE.LineBasicMaterial({ color: 0x000000 })
-];
+function makePyramidMesh(vertices, material) {
+  // vertices: [NW, NE, SE, SW, APEX] - 5 points
+  // Create 4 triangular faces (sides) + 2 triangles for base
+  const positions = [];
+  const v = vertices.map(arr => new THREE.Vector3(arr[0], arr[1], arr[2]));
 
-pyramids.forEach((p, i) => {
-  const wire = makeWire(p.vertices, mats[i % mats.length]);
-  wire.name = p.name;
+  // 4 side faces (each connects 2 base vertices to apex)
+  // Face 0: NW-NE-APEX
+  positions.push(v[0].x, v[0].y, v[0].z, v[1].x, v[1].y, v[1].z, v[4].x, v[4].y, v[4].z);
+  // Face 1: NE-SE-APEX
+  positions.push(v[1].x, v[1].y, v[1].z, v[2].x, v[2].y, v[2].z, v[4].x, v[4].y, v[4].z);
+  // Face 2: SE-SW-APEX
+  positions.push(v[2].x, v[2].y, v[2].z, v[3].x, v[3].y, v[3].z, v[4].x, v[4].y, v[4].z);
+  // Face 3: SW-NW-APEX
+  positions.push(v[3].x, v[3].y, v[3].z, v[0].x, v[0].y, v[0].z, v[4].x, v[4].y, v[4].z);
+
+  // Base (2 triangles): NW-NE-SE and NW-SE-SW
+  positions.push(v[0].x, v[0].y, v[0].z, v[2].x, v[2].y, v[2].z, v[1].x, v[1].y, v[1].z);
+  positions.push(v[0].x, v[0].y, v[0].z, v[3].x, v[3].y, v[3].z, v[2].x, v[2].y, v[2].z);
+
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geom.computeVertexNormals();
+  return new THREE.Mesh(geom, material);
+}
+
+const pyramidMat = new THREE.MeshBasicMaterial({
+  color: 0x8B7355,  // Sandy brown (same as Sphinx)
+  transparent: true,
+  opacity: 0.85,
+  side: THREE.DoubleSide
+});
+const pyramidWireMat = new THREE.LineBasicMaterial({ color: 0x000000 });
+
+pyramids.forEach((p) => {
+  // Filled mesh
+  const mesh = makePyramidMesh(p.vertices, pyramidMat);
+  mesh.name = p.name;
+  mesh.frustumCulled = false;
+  mesh.renderOrder = 9;
+  world.add(mesh);
+
+  // Wireframe overlay
+  const wire = makeWire(p.vertices, pyramidWireMat);
+  wire.name = p.name + " (wire)";
   wire.frustumCulled = false;
   wire.renderOrder = 10;
   world.add(wire);
@@ -237,6 +264,8 @@ const ALNILAM_DEC_RAD = deg2rad(-(1 + 12/60 + 7/3600));
 
 const angleEl = document.getElementById('angleReadout');
 
+// Sky sphere radius - all directional lines extend to this distance
+const SKY_RADIUS = 3500;
 
 // Red beam from Khufu center (0,0,0) toward Alnilam direction on the sky sphere.
 // Implemented as a thin cylinder so it remains visible at a wide range of zoom levels.
@@ -270,10 +299,40 @@ shaftLine.renderOrder = 9998;
 sceneMain.add(shaftLine);
 
 // Set once: constant orientation and position (from Khufu center outward)
-const SHAFT_LENGTH = 2500; // meters (visual length)
+const SHAFT_LENGTH = SKY_RADIUS; // extend to sky sphere
 shaftLine.scale.set(SHAFT_RADIUS, SHAFT_LENGTH, SHAFT_RADIUS);
 shaftLine.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), shaftDir);
 shaftLine.position.copy(shaftDir.clone().multiplyScalar(SHAFT_LENGTH / 2));
+
+// -----------------------------
+// Sphinx sight line - pointing due East, angled 15° upward
+// The Sphinx faces east toward the rising sun on the equinox
+// -----------------------------
+const SPHINX_SIGHT_AZ_RAD  = deg2rad(90.0);  // Due East (+X)
+const SPHINX_SIGHT_ALT_RAD = deg2rad(15.0);  // 15° above horizontal
+const sphinxSightDir = new THREE.Vector3(
+  Math.sin(SPHINX_SIGHT_AZ_RAD) * Math.cos(SPHINX_SIGHT_ALT_RAD),
+  Math.cos(SPHINX_SIGHT_AZ_RAD) * Math.cos(SPHINX_SIGHT_ALT_RAD),
+  Math.sin(SPHINX_SIGHT_ALT_RAD)
+).normalize();
+
+const SPHINX_SIGHT_LENGTH = SKY_RADIUS;  // extend to sky sphere
+const SPHINX_SIGHT_RADIUS = 2.0;
+const sphinxSightGeom = new THREE.CylinderGeometry(1, 1, 1, 18, 1, true);
+const sphinxSightMat = new THREE.MeshBasicMaterial({ color: 0x0055aa, depthTest: false, depthWrite: false });
+const sphinxSightLine = new THREE.Mesh(sphinxSightGeom, sphinxSightMat);
+sphinxSightLine.frustumCulled = false;
+sphinxSightLine.renderOrder = 9997;
+sphinxSightLine.scale.set(SPHINX_SIGHT_RADIUS, SPHINX_SIGHT_LENGTH, SPHINX_SIGHT_RADIUS);
+sphinxSightLine.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), sphinxSightDir);
+// Position at Sphinx center, offset so line extends outward from Sphinx head
+sphinxSightLine.position.set(
+  SPHINX_X + sphinxSightDir.x * (SPHINX_SIGHT_LENGTH / 2),
+  SPHINX_Y + sphinxSightDir.y * (SPHINX_SIGHT_LENGTH / 2),
+  10 + sphinxSightDir.z * (SPHINX_SIGHT_LENGTH / 2)  // Start at Sphinx head height (~10m)
+);
+sphinxSightLine.visible = false;  // Hidden by default (Khufu is default origin)
+world.add(sphinxSightLine);
 
 
 function makeTextSprite(text) {
@@ -325,12 +384,38 @@ function roundRect(ctx, x, y, w, h, r) {
 // Sky sphere + stars + constellation lines
 // Data from d3-celestial (J2000) hosted via jsDelivr.
 // -----------------------------
-const SKY_RADIUS = 3500;
 
 // -----------------------------
-// Ground plane extending to sky sphere
+// Ground plane centered on Khafre pyramid, sized to cover all objects
 // -----------------------------
-const groundGeom = new THREE.CircleGeometry(SKY_RADIUS, 64);
+const KHAFRE_X = -321.688;
+const KHAFRE_Y = -338.715;
+
+// Calculate farthest point from Khafre (check all pyramid vertices and Sphinx)
+let maxDistFromKhafre = 0;
+pyramids.forEach(p => {
+  p.vertices.forEach(v => {
+    const dx = v[0] - KHAFRE_X;
+    const dy = v[1] - KHAFRE_Y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > maxDistFromKhafre) maxDistFromKhafre = dist;
+  });
+});
+// Check Sphinx corners (body ~45m E-W, head extends to ~42m east of center)
+const sphinxPoints = [
+  [SPHINX_X + 42, SPHINX_Y],      // Front of head
+  [SPHINX_X - 22, SPHINX_Y + 7],  // Back left
+  [SPHINX_X - 22, SPHINX_Y - 7],  // Back right
+];
+sphinxPoints.forEach(pt => {
+  const dx = pt[0] - KHAFRE_X;
+  const dy = pt[1] - KHAFRE_Y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist > maxDistFromKhafre) maxDistFromKhafre = dist;
+});
+
+const GROUND_RADIUS = maxDistFromKhafre * 1.5;
+const groundGeom = new THREE.CircleGeometry(GROUND_RADIUS, 64);
 const groundMat = new THREE.MeshBasicMaterial({
   color: 0x808080,
   transparent: true,
@@ -339,8 +424,8 @@ const groundMat = new THREE.MeshBasicMaterial({
 });
 const groundPlane = new THREE.Mesh(groundGeom, groundMat);
 // CircleGeometry is in XY plane by default, which is horizontal in our Z-up system
-groundPlane.position.z = -0.5;
-sceneMain.add(groundPlane);
+groundPlane.position.set(KHAFRE_X, KHAFRE_Y, -0.5);
+world.add(groundPlane);
 
 // -----------------------------
 // Sky below horizon (darker hemisphere)
@@ -369,7 +454,7 @@ sceneMain.add(belowHorizon);
 // Error arc between Alnilam beam and shaft line
 // Blue curved arc at half sky radius, only visible when angle < 90°
 // -----------------------------
-const ERROR_ARC_RADIUS = SKY_RADIUS * 0.5;
+const ERROR_ARC_RADIUS = SKY_RADIUS;  // arc at sky sphere
 const ERROR_ARC_SEGMENTS = 64;
 const errorArcGeom = new THREE.BufferGeometry();
 const errorArcPositions = new Float32Array(ERROR_ARC_SEGMENTS * 3);
@@ -405,6 +490,13 @@ errorAngleEl.style.cssText = `
 document.body.appendChild(errorAngleEl);
 
 function updateErrorArc(alnilamDir) {
+  // Only show error arc when Khufu is selected (shaft alignment)
+  if (currentOriginKey !== 'khufu') {
+    errorArc.visible = false;
+    errorAngleEl.textContent = '';
+    return;
+  }
+
   // Calculate angle between Alnilam direction and shaft direction
   const dotProduct = alnilamDir.dot(shaftDir);
   const angle = Math.acos(Math.max(-1, Math.min(1, dotProduct)));
@@ -463,13 +555,6 @@ skyGroup.add(skyShell);
 
 let starPoints = null;
 let constLines = null;
-
-const toggleSky = document.getElementById('toggleSky');
-const toggleConst = document.getElementById('toggleConst');
-const toggleStars = document.getElementById('toggleStars');
-toggleSky.addEventListener('change', () => { skyGroup.visible = toggleSky.checked; });
-toggleConst.addEventListener('change', () => { if (constLines) constLines.visible = toggleConst.checked; });
-toggleStars.addEventListener('change', () => { if (starPoints) starPoints.visible = toggleStars.checked; });
 
 const statusEl = document.getElementById('loadStatus');
 
@@ -724,6 +809,7 @@ function parseConstellationSegments(data) {
   for (const f of data.features) {
     if (!f || !f.geometry) continue;
     const g = f.geometry;
+    const constId = f.id || (f.properties && f.properties.id) || 'unknown';
     const coordsList = [];
     if (g.type === 'LineString') coordsList.push(g.coordinates);
     if (g.type === 'MultiLineString') coordsList.push(...g.coordinates);
@@ -737,7 +823,7 @@ function parseConstellationSegments(data) {
         const de1 = deg2rad(a[1]);
         const ra2 = deg2rad(((b[0] % 360) + 360) % 360);
         const de2 = deg2rad(b[1]);
-        segments.push({ ra1, de1, ra2, de2 });
+        segments.push({ ra1, de1, ra2, de2, constId });
       }
     }
   }
@@ -779,12 +865,12 @@ async function loadSkyData() {
     skyGroup.add(constLines);
   }
 
-  // Apply current UI toggles.
-  skyGroup.visible = toggleSky.checked;
-  if (starPoints) starPoints.visible = toggleStars.checked;
-  if (constLines) constLines.visible = toggleConst.checked;
+  // Make sky elements visible
+  skyGroup.visible = true;
+  if (starPoints) starPoints.visible = true;
+  if (constLines) constLines.visible = true;
 
-  statusEl.textContent = `Sky loaded: ${starsData.length.toLocaleString()} stars, ${constSegs.length.toLocaleString()} line segments.`;
+  if (statusEl) statusEl.textContent = '';
   scheduleSkyUpdate();
 }
 
@@ -807,7 +893,7 @@ function buildStarsObject() {
     transparent: true,
     opacity: 0.95,
     depthWrite: false,
-    depthTest: false
+    depthTest: true  // Enable depth test so pyramids occlude stars
   });
 
   const pts = new THREE.Points(geom, mat);
@@ -819,8 +905,15 @@ function buildStarsObject() {
 function buildConstLinesObject() {
   const geom = new THREE.BufferGeometry();
   const positions = new Float32Array(constSegs.length * 2 * 3);
+  const colors = new Float32Array(constSegs.length * 2 * 3);
   geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  const mat = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25, depthTest: false });
+  geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const mat = new THREE.LineBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.4,
+    depthTest: true
+  });
   const lines = new THREE.LineSegments(geom, mat);
   lines.frustumCulled = false;
   lines.renderOrder = -5;
@@ -861,20 +954,68 @@ function updateSkyForJD(jd, epj) {
   // Constellation lines
   if (constLines) {
     const posAttr = constLines.geometry.getAttribute('position');
-    let w = 0;
+    const colAttr = constLines.geometry.getAttribute('color');
+
+    // Zodiac constellation IDs (IAU abbreviations)
+    const ZODIAC = new Set(['Ari', 'Tau', 'Gem', 'Cnc', 'Leo', 'Vir', 'Lib', 'Sco', 'Sgr', 'Cap', 'Aqr', 'Psc']);
+
+    // First pass: calculate positions and find nearest ZODIAC constellation to Sphinx sight line
+    let nearestConstId = null;
+    let nearestDist = Infinity;
+
+    // Sphinx sight direction (where the blue line points)
+    const sphinxTarget = new THREE.Vector3(
+      sphinxSightDir.x * SKY_RADIUS,
+      sphinxSightDir.y * SKY_RADIUS,
+      sphinxSightDir.z * SKY_RADIUS
+    );
+
+    const segPositions = [];
     for (const seg of constSegs) {
       const v1 = equatorialJ2000ToHorizontalUnit(seg.ra1, seg.de1, jd, latRad, lonRad, rp);
       const v2 = equatorialJ2000ToHorizontalUnit(seg.ra2, seg.de2, jd, latRad, lonRad, rp);
 
-      posAttr.array[w++] = v1.x * SKY_RADIUS;
-      posAttr.array[w++] = v1.y * SKY_RADIUS;
-      posAttr.array[w++] = v1.z * SKY_RADIUS;
+      const p1 = new THREE.Vector3(v1.x * SKY_RADIUS, v1.y * SKY_RADIUS, v1.z * SKY_RADIUS);
+      const p2 = new THREE.Vector3(v2.x * SKY_RADIUS, v2.y * SKY_RADIUS, v2.z * SKY_RADIUS);
+      segPositions.push({ p1, p2, constId: seg.constId });
 
-      posAttr.array[w++] = v2.x * SKY_RADIUS;
-      posAttr.array[w++] = v2.y * SKY_RADIUS;
-      posAttr.array[w++] = v2.z * SKY_RADIUS;
+      // Find distance from segment midpoint to sphinx target (only for zodiac constellations)
+      if (currentOriginKey === 'sphinx' && ZODIAC.has(seg.constId)) {
+        const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+        const dist = mid.distanceTo(sphinxTarget);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearestConstId = seg.constId;
+        }
+      }
     }
+
+    // Second pass: write positions and colors
+    let w = 0;
+    let c = 0;
+    for (let i = 0; i < constSegs.length; i++) {
+      const { p1, p2, constId } = segPositions[i];
+
+      posAttr.array[w++] = p1.x;
+      posAttr.array[w++] = p1.y;
+      posAttr.array[w++] = p1.z;
+      posAttr.array[w++] = p2.x;
+      posAttr.array[w++] = p2.y;
+      posAttr.array[w++] = p2.z;
+
+      // Color: red if nearest constellation in Sphinx mode, else black
+      const isHighlighted = (currentOriginKey === 'sphinx' && constId === nearestConstId);
+      const r = isHighlighted ? 0.85 : 0.0;
+      const g = 0.0;
+      const b = 0.0;
+
+      // Both vertices of the segment get same color
+      colAttr.array[c++] = r; colAttr.array[c++] = g; colAttr.array[c++] = b;
+      colAttr.array[c++] = r; colAttr.array[c++] = g; colAttr.array[c++] = b;
+    }
+
     posAttr.needsUpdate = true;
+    colAttr.needsUpdate = true;
   }
 
   // Alnilam beam + angle readout
@@ -882,7 +1023,7 @@ function updateSkyForJD(jd, epj) {
     const vA = equatorialJ2000ToHorizontalUnit(ALNILAM_RA_RAD, ALNILAM_DEC_RAD, jd, latRad, lonRad, rp);
     const dir = new THREE.Vector3(vA.x, vA.y, vA.z).normalize();
 
-    const length = SKY_RADIUS * 0.92;
+    const length = SKY_RADIUS;  // extend to sky sphere
     alnilamBeam.scale.set(BEAM_RADIUS, length, BEAM_RADIUS);
     alnilamBeam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
     alnilamBeam.position.copy(dir.clone().multiplyScalar(length / 2));
@@ -926,10 +1067,11 @@ function applyOrigin() {
   REF_LON_DEG = ORIGIN_SITES[currentOriginKey].lon;
   updateCoordDisplay();
 
-  // Reset view around the new origin
-  camera.position.set(350, 250, 500);
-  controls.target.set(0, 0, 60);
-  controls.update();
+  // Show/hide directional lines based on selected origin
+  shaftLine.visible = (currentOriginKey === 'khufu');
+  alnilamBeam.visible = (currentOriginKey === 'khufu');
+  errorArc.visible = (currentOriginKey === 'khufu');
+  sphinxSightLine.visible = (currentOriginKey === 'sphinx');
 
   scheduleSkyUpdate();
 }
@@ -1232,18 +1374,19 @@ function findAlnilamCulmination(y) {
 }
 
 
-yearSlider.addEventListener('input', () => {
-  // Snap to 95-year increments
-  let y = Number(yearSlider.value);
-  y = Math.round(y / 95) * 95;
-  yearInput.value = String(y);
-
+// Apply snap mode settings (used by both year slider and snap mode radio clicks)
+function applySnapMode() {
   const mode = document.querySelector('input[name="snapMode"]:checked').value;
+  const y = Number(yearInput.value);
 
   if (mode === 'solstice') {
-    // Summer solstice midnight
+    // Summer solstice midnight - only change what's needed
     doySlider.value = '172';
     timeSlider.value = '0';
+  } else if (mode === 'dawn') {
+    // Summer solstice dawn (6:00 AM)
+    doySlider.value = '172';
+    timeSlider.value = '6';
   } else {
     // Alnilam culmination - find when it transits closest to midnight
     const { doy, time } = findAlnilamCulmination(y);
@@ -1253,6 +1396,20 @@ yearSlider.addEventListener('input', () => {
 
   updateTimeLabels();
   scheduleSkyUpdate();
+}
+
+// Snap mode radio buttons - apply immediately when clicked
+document.querySelectorAll('input[name="snapMode"]').forEach(radio => {
+  radio.addEventListener('change', applySnapMode);
+});
+
+yearSlider.addEventListener('input', () => {
+  // Snap to 95-year increments
+  let y = Number(yearSlider.value);
+  y = Math.round(y / 95) * 95;
+  yearInput.value = String(y);
+
+  applySnapMode();
 });
 
 yearInput.addEventListener('change', () => {
@@ -1406,8 +1563,7 @@ function animate() {
 
   renderer.autoClear = false;
   renderer.clear();
-  renderer.render(sceneMain, camera);
-  renderer.clearDepth();
-  renderer.render(sceneSky, camera);
+  renderer.render(sceneMain, camera); // Render main scene first (writes depth)
+  renderer.render(sceneSky, camera);  // Render sky (stars check depth, get occluded by pyramids)
 }
 animate();
